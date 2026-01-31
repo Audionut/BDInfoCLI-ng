@@ -67,6 +67,7 @@ namespace BDInfo.Cli
             public long FinishedBytes;
             public Exception? Exception;
             public DateTime StartTime;
+            public bool IsFullScan;
         }
 
         private static void ScanBDROMProgress(object? state)
@@ -119,7 +120,7 @@ namespace BDInfo.Cli
                 return;
             try
             {
-                s.StreamFile.Scan(s.Playlists, true);
+                s.StreamFile.Scan(s.Playlists, s.IsFullScan);
             }
             catch (Exception ex)
             {
@@ -374,7 +375,7 @@ namespace BDInfo.Cli
                     Console.WriteLine("{0,16}{1,-15}{2,-13}{3}", "", "File", "Elapsed", "Remaining");
                     Console.Write("Scanning entire disc...");
                     var discSw = System.Diagnostics.Stopwatch.StartNew();
-                    var scanState = new ScanState();
+                    var scanState = new ScanState() { IsFullScan = whole };
                     foreach (TSStreamFile streamFile in streamFiles)
                     {
                         try
@@ -459,7 +460,7 @@ namespace BDInfo.Cli
                             }
                         }
 
-                        var scanState = new ScanState();
+                        var scanState = new ScanState() { IsFullScan = whole };
                         foreach (TSStreamFile streamFile in filesForPlaylist)
                         {
                             try
