@@ -21,10 +21,12 @@ using System;
 using System.Collections;
 using System.Collections.Specialized;
 using System.IO;
+using System.Buffers;
 
 namespace BDInfo
 {
     public class TSStreamBuffer
+        : IDisposable
     {
         private readonly MemoryStream _stream;
         private int _skipBits;
@@ -35,8 +37,46 @@ namespace BDInfo
 
         public TSStreamBuffer()
         {
-            _buffer = new byte[5242880];
+            _buffer = ArrayPool<byte>.Shared.Rent(5242880);
             _stream = new MemoryStream(_buffer);
+        }
+
+        private bool _disposed = false;
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            try
+            {
+                if (disposing)
+                {
+                    _stream?.Dispose();
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (_buffer != null && _buffer.Length > 0)
+                {
+                    ArrayPool<byte>.Shared.Return(_buffer);
+                }
+            }
+            catch { }
+
+            _disposed = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        ~TSStreamBuffer()
+        {
+            Dispose(false);
         }
 
         public long Length => _bufferLength;

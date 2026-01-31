@@ -23,7 +23,9 @@ using System.IO;
 using DiscUtils;
 using DiscUtils.Udf;
 using System.Numerics;
+using System.Buffers;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace BDInfo
 {
@@ -500,6 +502,12 @@ namespace BDInfo
 
         public void Scan(List<TSPlaylistFile> playlists, bool isFullScan)
         {
+            // Keep synchronous wrapper for compatibility
+            ScanAsync(playlists, isFullScan).GetAwaiter().GetResult();
+        }
+
+        public async Task ScanAsync(List<TSPlaylistFile> playlists, bool isFullScan)
+        {
             if (playlists == null || playlists.Count == 0)
             {
                 return;
@@ -508,6 +516,8 @@ namespace BDInfo
             Playlists = playlists;
             int dataSize = 5242880;
             Stream fileStream = null;
+            byte[] buffer = null;
+            int bufferLength = 0;
             try
             {
                 string fileName;
@@ -557,7 +567,7 @@ namespace BDInfo
                         FileMode.Open,
                         FileAccess.Read,
                         FileShare.Read,
-                        dataSize, false);
+                        65536, FileOptions.SequentialScan | FileOptions.Asynchronous);
                 }
                 else
                 {
@@ -567,6 +577,11 @@ namespace BDInfo
                 Size = 0;
                 Length = 0;
 
+                // Dispose any existing rented buffers before clearing
+                foreach (var ss in StreamStates.Values)
+                {
+                    try { ss?.StreamBuffer?.Dispose(); } catch { }
+                }
                 Streams.Clear();
                 StreamStates.Clear();
                 StreamDiagnostics.Clear();
@@ -575,8 +590,7 @@ namespace BDInfo
                     new TSPacketParser();
 
                 long fileLength = (uint)fileStream.Length;
-                byte[] buffer = new byte[dataSize];
-                int bufferLength = 0;
+                buffer = ArrayPool<byte>.Shared.Rent(dataSize);
 
 #if DEBUG && !BETA
                 var appPath = this.GetType().Assembly.Location;
@@ -598,8 +612,7 @@ namespace BDInfo
                 logTextWriter = new StreamWriter(logFile);
                 logTextWriter.WriteLine(String.Format("{0,6}\t{1,16}\t{2,16}\t{3,16}\t{4,16}\t{5,16}\t{6,16}\t{7,16}", "PID", "Active Bitrate", "Window Bytes", "Payload Bytes", "Window Packets", "Packet Count", "Packet Seconds", "Stream Interval"));
 #endif
-                while ((bufferLength =
-                fileStream.Read(buffer, 0, buffer.Length)) > 0)
+                while ((bufferLength = await fileStream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
                 {
                     int offset = 0;
                     for (int i = 0; i < bufferLength; i++)
@@ -855,7 +868,7 @@ namespace BDInfo
                                 {
                                     --parser.PATSectionLength;
                                     --parser.PATSectionParse;
-
+                                    
                                     switch (parser.PATSectionParse)
                                     {
                                         case 4:
@@ -1622,6 +1635,15 @@ namespace BDInfo
                 logTextWriter?.Close();
                 logFile?.Close();
 #endif
+                try
+                {
+                    if (buffer != null)
+                    {
+                        ArrayPool<byte>.Shared.Return(buffer);
+                    }
+                }
+                catch { }
+
                 fileStream?.Close();
             }
         }

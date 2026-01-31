@@ -107,7 +107,7 @@ namespace BDInfo
             {
                 report.AppendFormat(CultureInfo.InvariantCulture,
                     "{0,-16}{1}\r\n", "Extras:",
-                    string.Join(", ", extraFeatures.ToArray()));
+                    string.Join(", ", extraFeatures));
             }
             report.AppendFormat(CultureInfo.InvariantCulture,
                 "{0,-16}{1}\r\n", "BDInfo:",
