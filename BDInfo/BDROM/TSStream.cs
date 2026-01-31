@@ -20,6 +20,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 
 namespace BDInfo
 {
@@ -580,20 +581,17 @@ namespace BDInfo
         {
             get
             {
-                string description = "";
+                var description = new StringBuilder();
 
                 if (BaseView != null)
                 {
-                    if (BaseView == true)
-                        description += "Right Eye";
-                    else
-                        description += "Left Eye";
-                    description += " / ";
+                    description.Append(BaseView == true ? "Right Eye" : "Left Eye");
+                    description.Append(" / ");
                 }
 
                 if (Height > 0)
                 {
-                    description += string.Format(CultureInfo.InvariantCulture,
+                    description.AppendFormat(CultureInfo.InvariantCulture,
                                                  "{0:D}{1} / ",
                                                  Height,
                                                  IsInterlaced ? "i" : "p");
@@ -603,13 +601,13 @@ namespace BDInfo
                 {
                     if (FrameRateEnumerator % FrameRateDenominator == 0)
                     {
-                        description += string.Format(CultureInfo.InvariantCulture,
+                        description.AppendFormat(CultureInfo.InvariantCulture,
                                                     "{0:D} fps / ",
                                                     FrameRateEnumerator / FrameRateDenominator);
                     }
                     else
                     {
-                        description += string.Format(CultureInfo.InvariantCulture,
+                        description.AppendFormat(CultureInfo.InvariantCulture,
                                                     "{0:F3} fps / ",
                                                     (double)FrameRateEnumerator / FrameRateDenominator);
                     }
@@ -617,27 +615,29 @@ namespace BDInfo
                 }
                 if (AspectRatio == TSAspectRatio.ASPECT_4_3)
                 {
-                    description += "4:3 / ";
+                    description.Append("4:3 / ");
                 }
                 else if (AspectRatio == TSAspectRatio.ASPECT_16_9)
                 {
-                    description += "16:9 / ";
+                    description.Append("16:9 / ");
                 }
                 if (EncodingProfile != null)
                 {
-                    description += EncodingProfile + " / ";
+                    description.Append(EncodingProfile).Append(" / ");
                 }
                 if (StreamType == TSStreamType.HEVC_VIDEO && ExtendedData != null)
                 {
                     var extendedData = (TSCodecHEVC.ExtendedDataSet) ExtendedData;
                     string extendedInfo = string.Join(" / ", extendedData.ExtendedFormatInfo);
-                    description += extendedInfo;
+                    description.Append(extendedInfo);
                 }
-                if (description.EndsWith(" / "))
+                if (description.Length >= 3)
                 {
-                    description = description.Substring(0, description.Length - 3);
+                    var tail = description.ToString(description.Length - 3, 3);
+                    if (tail == " / ")
+                        description.Remove(description.Length - 3, 3);
                 }
-                return description;
+                return description.ToString();
             }
         }
 
@@ -720,10 +720,10 @@ namespace BDInfo
                 {
                 }
 
-                string description = "";
+                var description = new StringBuilder();
                 if (ChannelCount > 0)
                 {
-                    description += string.Format(CultureInfo.InvariantCulture,
+                    description.AppendFormat(CultureInfo.InvariantCulture,
                                                  "{0:D}.{1:D}",
                                                  ChannelCount,
                                                  LFE);
@@ -733,13 +733,13 @@ namespace BDInfo
                     switch (ChannelLayout)
                     {
                         case TSChannelLayout.CHANNELLAYOUT_MONO:
-                            description += "1.0";
+                            description.Append("1.0");
                             break;
                         case TSChannelLayout.CHANNELLAYOUT_STEREO:
-                            description += "2.0";
+                            description.Append("2.0");
                             break;
                         case TSChannelLayout.CHANNELLAYOUT_MULTI:
-                            description += "5.1";
+                            description.Append("5.1");
                             break;
                     }
                 }
@@ -747,16 +747,16 @@ namespace BDInfo
                 {
                     if (StreamType == TSStreamType.AC3_AUDIO)
                     {
-                        description += "-EX";
+                        description.Append("-EX");
                     }
                     if (StreamType == TSStreamType.DTS_AUDIO ||
                         StreamType == TSStreamType.DTS_HD_AUDIO ||
                         StreamType == TSStreamType.DTS_HD_MASTER_AUDIO)
                     {
-                        description += "-ES";
+                        description.Append("-ES");
                     }
                 }
-                return description;
+                return description.ToString();
             }
         }
 
@@ -764,11 +764,11 @@ namespace BDInfo
         {
             get
             {
-                string description = ChannelDescription;
+                var description = new StringBuilder(ChannelDescription);
 
                 if (SampleRate > 0)
                 {
-                    description += string.Format(CultureInfo.InvariantCulture,
+                    description.AppendFormat(CultureInfo.InvariantCulture,
                                                  " / {0:D} kHz",
                                                  SampleRate / 1000);
                 }
@@ -777,19 +777,19 @@ namespace BDInfo
                     long CoreBitRate = 0;
                     if (StreamType == TSStreamType.AC3_TRUE_HD_AUDIO && CoreStream != null)
                         CoreBitRate = CoreStream.BitRate;
-                    description += string.Format(CultureInfo.InvariantCulture,
+                    description.AppendFormat(CultureInfo.InvariantCulture,
                                                  " / {0,5:D} kbps",
                                                  (uint)Math.Round((double)(BitRate - CoreBitRate) / 1000));
                 }
                 if (BitDepth > 0)
                 {
-                    description += string.Format(CultureInfo.InvariantCulture,
+                    description.AppendFormat(CultureInfo.InvariantCulture,
                                                  " / {0:D}-bit",
                                                  BitDepth);
                 }
                 if (DialNorm != 0)
                 {
-                    description += string.Format(CultureInfo.InvariantCulture,
+                    description.AppendFormat(CultureInfo.InvariantCulture,
                                                  " / DN {0}dB",
                                                  DialNorm);
                 }
@@ -798,21 +798,23 @@ namespace BDInfo
                     switch (AudioMode)
                     {
                         case TSAudioMode.DualMono:
-                            description += " / Dual Mono";
+                            description.Append(" / Dual Mono");
                             break;
 
                         case TSAudioMode.Surround:
-                            description += " / Dolby Surround";
+                            description.Append(" / Dolby Surround");
                             break;
 
                         case TSAudioMode.JointStereo:
-                            description += " / Joint Stereo";
+                            description.Append(" / Joint Stereo");
                             break;
                     }
                 }
-                if (description.EndsWith(" / "))
+                if (description.Length >= 3)
                 {
-                    description = description.Substring(0, description.Length - 3);
+                    var tail = description.ToString(description.Length - 3, 3);
+                    if (tail == " / ")
+                        description.Remove(description.Length - 3, 3);
                 }
                 if (CoreStream != null)
                 {
@@ -829,12 +831,12 @@ namespace BDInfo
                             codec = "DD+ Embedded";
                             break;
                     }
-                    description += string.Format(   CultureInfo.InvariantCulture,
+                    description.AppendFormat(   CultureInfo.InvariantCulture,
                                                     " ({0}: {1})",
                                                     codec,
                                                     CoreStream.Description);
                 }
-                return description;
+                return description.ToString();
             }
         }
 

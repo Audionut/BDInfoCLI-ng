@@ -1,15 +1,16 @@
-FROM mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2022 as builder
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
+WORKDIR /src
 COPY . .
-RUN nuget restore -NonInteractive
-# && msbuild BDInfo.sln /t:Build /p:Configuration=Release /p:OutDir=/usr/src/app/build/
-RUN xbuild /property:Configuration=Release /property:OutDir=/usr/src/app/build/
-# RUN msbuild /t:Restore /p:Configuration=Release /p:OutDir=/usr/src/app/build/
-RUN ls -lA *
 
-FROM mono:5.12
-RUN mkdir -p /usr/src/app/build
-COPY --from=builder /usr/src/app/build/ /usr/src/app/build/
-WORKDIR /usr/src/app/build
+RUN dotnet restore bdinfo-cli/bdinfo-cli.csproj
+RUN dotnet publish bdinfo-cli/bdinfo-cli.csproj -c Release -o /app/publish
 
-ENTRYPOINT [ "mono",  "BDInfo.exe" ]
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/runtime:8.0-alpine
+
+WORKDIR /app
+COPY --from=build /app/publish .
+
+ENTRYPOINT ["./BDInfo"]

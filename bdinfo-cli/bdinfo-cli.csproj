@@ -28,6 +28,16 @@
     <PublishTrimmed>true</PublishTrimmed>
     <PublishReadyToRun>true</PublishReadyToRun>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- Publish binary name -->
+    <AssemblyName>bdinfo</AssemblyName>
+    <!-- Disable generation of program database (PDB) and debug symbols for Release publishes -->
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
+
+    <!-- Remove unwanted native DLLs from the publish output (e.g. lzfse.dll) -->
+    <Target Name="RemoveUnwantedNativeDlls" AfterTargets="Publish">
+      <Delete Files="$(PublishDir)lzfse.dll" ContinueOnError="true" />
+    </Target>
 
 </Project>

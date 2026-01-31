@@ -473,34 +473,35 @@ namespace BDInfo
                     {
                         if (!stream.IsVideoStream) continue;
 
-                        string streamName = stream.CodecName;
+                        var nameBuilder = new StringBuilder(stream.CodecName);
                         if (stream.AngleIndex > 0)
                         {
-                            streamName += string.Format(CultureInfo.InvariantCulture,
+                            nameBuilder.AppendFormat(CultureInfo.InvariantCulture,
                                 " ({0})", stream.AngleIndex);
                         }
 
-                        string streamBitrate = string.Format(CultureInfo.InvariantCulture,
+                        var bitrateBuilder = new StringBuilder();
+                        bitrateBuilder.AppendFormat(CultureInfo.InvariantCulture,
                             "{0:D}",
                             (int)Math.Round((double)stream.BitRate / 1000));
                         if (stream.AngleIndex > 0)
                         {
-                            streamBitrate += string.Format(CultureInfo.InvariantCulture,
+                            bitrateBuilder.AppendFormat(CultureInfo.InvariantCulture,
                                 " ({0:D})",
                                 (int)Math.Round((double)stream.ActiveBitRate / 1000));
                         }
-                        streamBitrate += " kbps";
+                        bitrateBuilder.Append(" kbps");
 
                         report.AppendFormat(CultureInfo.InvariantCulture,
                             "{0,-24}{1,-20}{2,-16}\r\n",
-                            (stream.IsHidden ? "* " : "") + streamName,
-                            streamBitrate,
+                            (stream.IsHidden ? "* " : "") + nameBuilder.ToString(),
+                            bitrateBuilder.ToString(),
                             stream.Description);
 
                         summary.AppendFormat(CultureInfo.InvariantCulture,
                             (stream.IsHidden ? "* " : "") + "Video: {0} / {1} / {2}\r\n",
-                            streamName,
-                            streamBitrate,
+                            nameBuilder.ToString(),
+                            bitrateBuilder.ToString(),
                             stream.Description);
                     }
                 }

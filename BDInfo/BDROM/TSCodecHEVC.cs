@@ -21,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 
 namespace BDInfo
 {
@@ -598,40 +599,44 @@ namespace BDInfo
                 SeqParameterSetStruct seqParameterSet = SeqParameterSets[0];
                 if (seqParameterSet.ProfileSpace == 0)
                 {
-                    var profile = string.Empty;
+                    var profile = new StringBuilder();
                     if (seqParameterSet.ProfileIDC > 0)
                     {
+                        string baseProfile = string.Empty;
                         switch (seqParameterSet.ProfileIDC)
                         {
                             case 0:
-                                profile = "No profile";
+                                baseProfile = "No profile";
                                 break;
                             case 1:
-                                profile = "Main";
+                                baseProfile = "Main";
                                 break;
                             case 2:
-                                profile = "Main 10";
+                                baseProfile = "Main 10";
                                 break;
                             case 3:
-                                profile = "Main Still";
+                                baseProfile = "Main Still";
                                 break;
                             default:
-                                profile = "";
+                                baseProfile = "";
                                 break;
                         }
+                        if (!string.IsNullOrEmpty(baseProfile))
+                            profile.Append(baseProfile);
                     }
                     if (seqParameterSet.LevelIDC > 0)
                     {
                         var calcLevel = (float)seqParameterSet.LevelIDC / 30;
                         var dec = seqParameterSet.LevelIDC % 10;
-                        profile += " @ Level " +
-                                   string.Format(CultureInfo.InvariantCulture, dec >= 1 ? "{0:0.0}" : "{0:0}", calcLevel) +
-                                   " @ ";
-                        if (seqParameterSet.TierFlag) profile += "High";
-                        else profile += "Main";
+                        if (profile.Length > 0)
+                            profile.Append(' ');
+                        profile.Append("@ Level ");
+                        profile.AppendFormat(CultureInfo.InvariantCulture, dec >= 1 ? "{0:0.0}" : "{0:0}", calcLevel);
+                        profile.Append(" @ ");
+                        profile.Append(seqParameterSet.TierFlag ? "High" : "Main");
                     }
 
-                    stream.EncodingProfile = profile;
+                    stream.EncodingProfile = profile.ToString();
 
                     if (seqParameterSet.ChromaFormatIDC > 0)
                     {

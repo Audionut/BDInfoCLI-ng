@@ -1,12 +1,6 @@
 # BDInfoCLI-ng
 
-> Modified from: https://github.com/Ethan930717/BDInfoCLI-ng/tree/kimoji-bdinfo
-
-Original source origin: http://www.cinemasquid.com/blu-ray/tools/bdinfo
-
-BDInfoCLI-ng forked from: https://github.com/UniqProject/BDInfo
-
-Additional sources from BDInfoCLI (https://github.com/Tripplesixty/BDInfoCLI)
+Forked and modified version of https://github.com/rokibhasansagar/BDInfoCLI-ng
 
 BDInfoCLI-ng is the latest BDInfo (with UHD support) modified for use as a CLI utility. BDInfoCLI-ng implements an interface similar to BDInfoCLI, but on the latest BDInfo code base and with code changes designed to be as minimally invasive as possible for easier maintainability with BDInfo updates.
 
