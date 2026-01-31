@@ -79,7 +79,8 @@ jobs:
         shell: pwsh
         run: |
           Set-Location publish
-          Get-ChildItem -Filter "${{ matrix.artifact }}.*" | ForEach-Object {
+          # Only enumerate files (skip folders) to avoid AccessDenied when directories exist
+          Get-ChildItem -File -Filter "${{ matrix.artifact }}.*" | ForEach-Object {
             $h = Get-FileHash -Algorithm SHA256 $_.FullName
             "{0}  {1}" -f $h.Hash, $_.Name | Out-File -FilePath ($_.FullName + '.sha256') -Encoding ascii
           }
