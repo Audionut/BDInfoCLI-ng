@@ -137,12 +137,13 @@ namespace BDInfo.Cli
             string? mpls = null;
 
             // Lightweight, cross-platform option parsing (replaces Mono.Options)
+            // Accept options anywhere in the args list (so users can supply flags
+            // before or after positional arguments).
             List<string> nsargs = new List<string>();
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i] ?? string.Empty;
                 if (a == "--") { nsargs.AddRange(args.Skip(i + 1)); break; }
-                if (!a.StartsWith("-") || a == "") { nsargs.AddRange(args.Skip(i)); break; }
 
                 if (a == "-h" || a == "--help") { help = true; continue; }
                 if (a == "-l" || a == "--list") { list = true; continue; }
@@ -150,6 +151,13 @@ namespace BDInfo.Cli
                 if (a == "-v" || a == "--version") { version = true; continue; }
                 if (a.StartsWith("-m=") || a.StartsWith("--mpls=")) { mpls = a.Substring(a.IndexOf('=') + 1); continue; }
                 if (a == "-m" || a == "--mpls") { if (i + 1 < args.Length) { mpls = args[++i]; continue; } else show_help("Error - missing value for --mpls"); }
+
+                // Non-option argument: treat as positional (BD_PATH or REPORT_DEST)
+                if (!string.IsNullOrEmpty(a) && !a.StartsWith("-"))
+                {
+                    nsargs.Add(a);
+                    continue;
+                }
 
                 show_help($"Unknown option: {a}");
             }
@@ -272,6 +280,20 @@ namespace BDInfo.Cli
                         selectedPlaylists.Add(playlist);
                     playlistIdx++;
                 }
+            }
+            // If user requested a list of playlists, print them and exit.
+            if (list)
+            {
+                Console.WriteLine("Playlists:");
+                foreach (var kv in playlistDict.OrderBy(k => k.Key))
+                {
+                    var idx = kv.Key;
+                    var pl = kv.Value;
+                    var duration = TimeSpan.FromSeconds(pl.TotalLength);
+                    var path = pl.GetFilePath();
+                    Console.WriteLine(String.Format("{0,3}: {1,-20} {2,10} {3}", idx, pl.Name, duration.ToString("hh\\:mm\\:ss"), path));
+                }
+                return 0;
             }
             if (whole)
             {
