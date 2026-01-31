@@ -127,7 +127,7 @@ namespace BDInfo
                 return null;
             }
 
-            var value = new byte[bytes];
+            var value = ArrayPool<byte>.Shared.Rent(bytes);
             _stream.Read(value, 0, bytes);
             return value;
         }

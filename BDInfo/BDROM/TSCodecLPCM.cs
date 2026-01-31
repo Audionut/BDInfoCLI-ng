@@ -20,6 +20,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Buffers;
 
 namespace BDInfo
 {
@@ -33,7 +34,9 @@ namespace BDInfo
             if (stream.IsInitialized) return;
 
             byte[] header = buffer.ReadBytes(4);
+            if (header == null) return;
             int flags = (header[2] << 8) + header[3];
+            ArrayPool<byte>.Shared.Return(header);
 
             switch ((flags & 0xF000) >> 12)
             {

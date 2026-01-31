@@ -74,7 +74,13 @@ namespace BDInfo
 
                 if (FileInfo != null)
                 {
-                    fileStream = File.OpenRead(FileInfo.FullName);
+                    fileStream = new FileStream(
+                        FileInfo.FullName,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read,
+                        65536,
+                        FileOptions.SequentialScan | FileOptions.Asynchronous);
                     fileReader = new BinaryReader(fileStream);
                     streamLength = (ulong)fileStream.Length;
                 }

@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Buffers;
 using DiscUtils;
 using DiscUtils.Udf;
 
@@ -278,282 +279,295 @@ namespace BDInfo
                     streamLength = (ulong)discFileStream.Length;
                 }
 
-                byte[] data = new byte[streamLength];
-                int dataLength = fileReader.Read(data, 0, data.Length);
-
-                int pos = 0;
-
-                FileType = ToolBox.ReadString(data, 8, ref pos);
-                if (FileType != "MPLS0100" && FileType != "MPLS0200" && FileType != "MPLS0300")
+                byte[] data = null;
+                int dataLength = 0;
+                int bufferSize = (int)streamLength;
+                data = ArrayPool<byte>.Shared.Rent(bufferSize);
+                try
                 {
-                    throw new Exception(string.Format(
-                        "Playlist {0} has an unknown file type {1}.",
-                        FileInfo.Name, FileType));
-                }
+                    dataLength = fileReader.Read(data, 0, bufferSize);
 
-                int playlistOffset = ReadInt32(data, ref pos);
-                int chaptersOffset = ReadInt32(data, ref pos);
-                int extensionsOffset = ReadInt32(data, ref pos);
+                    int pos = 0;
 
-                // misc flags
-                pos = 0x38;
-                byte miscFlags = ReadByte(data, ref pos);
-
-                // MVC_Base_view_R_flag is stored in 4th bit
-                MVCBaseViewR = (miscFlags & 0x10) != 0;
-
-                pos = playlistOffset;
-
-                int playlistLength = ReadInt32(data, ref pos);
-                int playlistReserved = ReadInt16(data, ref pos);
-                int itemCount = ReadInt16(data, ref pos);
-                int subitemCount = ReadInt16(data, ref pos);
-
-                List<TSStreamClip> chapterClips = new List<TSStreamClip>();
-                for (int itemIndex = 0; itemIndex < itemCount; itemIndex++)
-                {
-                    int itemStart = pos;
-                    int itemLength = ReadInt16(data, ref pos);
-                    string itemName = ToolBox.ReadString(data, 5, ref pos);
-                    string itemType = ToolBox.ReadString(data, 4, ref pos);
-
-                    TSStreamFile streamFile = null;
-                    string streamFileName = string.Format(
-                        "{0}.M2TS", itemName);
-                    if (streamFiles.ContainsKey(streamFileName))
-                    {
-                        streamFile = streamFiles[streamFileName];
-                    }
-                    if (streamFile == null)
-                    {
-                        Debug.WriteLine(string.Format(
-                            "Playlist {0} referenced missing file {1}.",
-                            FileInfo.Name, streamFileName));
-                    }
-
-                    TSStreamClipFile streamClipFile = null;
-                    string streamClipFileName = string.Format(
-                        "{0}.CLPI", itemName);
-                    if (streamClipFiles.ContainsKey(streamClipFileName))
-                    {
-                        streamClipFile = streamClipFiles[streamClipFileName];
-                    }
-                    if (streamClipFile == null)
+                    FileType = ToolBox.ReadString(data, 8, ref pos);
+                    if (FileType != "MPLS0100" && FileType != "MPLS0200" && FileType != "MPLS0300")
                     {
                         throw new Exception(string.Format(
-                            "Playlist {0} referenced missing file {1}.",
-                            FileInfo.Name, streamFileName));
+                            "Playlist {0} has an unknown file type {1}.",
+                            FileInfo.Name, FileType));
                     }
 
-                    pos += 1;
-                    int multiangle = (data[pos] >> 4) & 0x01;
-                    int condition = data[pos] & 0x0F;
-                    pos += 2;
+                    int playlistOffset = ReadInt32(data, ref pos);
+                    int chaptersOffset = ReadInt32(data, ref pos);
+                    int extensionsOffset = ReadInt32(data, ref pos);
 
-                    int inTime = ReadInt32(data, ref pos);
-                    if (inTime < 0) inTime &= 0x7FFFFFFF;
-                    double timeIn = (double)inTime / 45000;
+                    // misc flags
+                    pos = 0x38;
+                    byte miscFlags = ReadByte(data, ref pos);
 
-                    int outTime = ReadInt32(data, ref pos);
-                    if (outTime < 0) outTime &= 0x7FFFFFFF;
-                    double timeOut = (double)outTime / 45000;
+                    // MVC_Base_view_R_flag is stored in 4th bit
+                    MVCBaseViewR = (miscFlags & 0x10) != 0;
 
-                    TSStreamClip streamClip = new TSStreamClip(
-                        streamFile, streamClipFile);
+                    pos = playlistOffset;
 
-                    streamClip.Name = streamFileName; //TODO
-                    streamClip.TimeIn = timeIn;
-                    streamClip.TimeOut = timeOut;
-                    streamClip.Length = streamClip.TimeOut - streamClip.TimeIn;
-                    streamClip.RelativeTimeIn = TotalLength;
-                    streamClip.RelativeTimeOut = streamClip.RelativeTimeIn + streamClip.Length;
-                    streamClip.RelativeLength = streamClip.Length / TotalLength;
-                    StreamClips.Add(streamClip);
-                    chapterClips.Add(streamClip);
+                    int playlistLength = ReadInt32(data, ref pos);
+                    int playlistReserved = ReadInt16(data, ref pos);
+                    int itemCount = ReadInt16(data, ref pos);
+                    int subitemCount = ReadInt16(data, ref pos);
 
-                    pos += 12;
-                    if (multiangle > 0)
+                    List<TSStreamClip> chapterClips = new List<TSStreamClip>();
+                    for (int itemIndex = 0; itemIndex < itemCount; itemIndex++)
                     {
-                        int angles = data[pos];
-                        pos += 2;
-                        for (int angle = 0; angle < angles - 1; angle++)
+                        int itemStart = pos;
+                        int itemLength = ReadInt16(data, ref pos);
+                        string itemName = ToolBox.ReadString(data, 5, ref pos);
+                        string itemType = ToolBox.ReadString(data, 4, ref pos);
+
+                        TSStreamFile streamFile = null;
+                        string streamFileName = string.Format(
+                            "{0}.M2TS", itemName);
+                        if (streamFiles.ContainsKey(streamFileName))
                         {
-                            string angleName = ToolBox.ReadString(data, 5, ref pos);
-                            string angleType = ToolBox.ReadString(data, 4, ref pos);
-                            pos += 1;
-
-                            TSStreamFile angleFile = null;
-                            string angleFileName = string.Format(
-                                "{0}.M2TS", angleName);
-                            if (streamFiles.ContainsKey(angleFileName))
-                            {
-                                angleFile = streamFiles[angleFileName];
-                            }
-                            if (angleFile == null)
-                            {
-                                throw new Exception(string.Format(
-                                    "Playlist {0} referenced missing angle file {1}.",
-                                    FileInfo.Name, angleFileName));
-                            }
-
-                            TSStreamClipFile angleClipFile = null;
-                            string angleClipFileName = string.Format(
-                                "{0}.CLPI", angleName);
-                            if (streamClipFiles.ContainsKey(angleClipFileName))
-                            {
-                                angleClipFile = streamClipFiles[angleClipFileName];
-                            }
-                            if (angleClipFile == null)
-                            {
-                                throw new Exception(string.Format(
-                                    "Playlist {0} referenced missing angle file {1}.",
-                                    FileInfo.Name, angleClipFileName));
-                            }
-
-                            TSStreamClip angleClip =
-                                new TSStreamClip(angleFile, angleClipFile);
-                            angleClip.AngleIndex = angle + 1;
-                            angleClip.TimeIn = streamClip.TimeIn;
-                            angleClip.TimeOut = streamClip.TimeOut;
-                            angleClip.RelativeTimeIn = streamClip.RelativeTimeIn;
-                            angleClip.RelativeTimeOut = streamClip.RelativeTimeOut;
-                            angleClip.Length = streamClip.Length;
-                            StreamClips.Add(angleClip);
+                            streamFile = streamFiles[streamFileName];
                         }
-                        if (angles - 1 > AngleCount) AngleCount = angles - 1;
-                    }
+                        if (streamFile == null)
+                        {
+                            Debug.WriteLine(string.Format(
+                                "Playlist {0} referenced missing file {1}.",
+                                FileInfo.Name, streamFileName));
+                        }
 
-                    int streamInfoLength = ReadInt16(data, ref pos);
-                    pos += 2;
-                    int streamCountVideo = data[pos++];
-                    int streamCountAudio = data[pos++];
-                    int streamCountPG = data[pos++];
-                    int streamCountIG = data[pos++];
-                    int streamCountSecondaryAudio = data[pos++];
-                    int streamCountSecondaryVideo = data[pos++];
-                    int streamCountPIP = data[pos++];
-                    pos += 5;
+                        TSStreamClipFile streamClipFile = null;
+                        string streamClipFileName = string.Format(
+                            "{0}.CLPI", itemName);
+                        if (streamClipFiles.ContainsKey(streamClipFileName))
+                        {
+                            streamClipFile = streamClipFiles[streamClipFileName];
+                        }
+                        if (streamClipFile == null)
+                        {
+                            throw new Exception(string.Format(
+                                "Playlist {0} referenced missing file {1}.",
+                                FileInfo.Name, streamFileName));
+                        }
+
+                        pos += 1;
+                        int multiangle = (data[pos] >> 4) & 0x01;
+                        int condition = data[pos] & 0x0F;
+                        pos += 2;
+
+                        int inTime = ReadInt32(data, ref pos);
+                        if (inTime < 0) inTime &= 0x7FFFFFFF;
+                        double timeIn = (double)inTime / 45000;
+
+                        int outTime = ReadInt32(data, ref pos);
+                        if (outTime < 0) outTime &= 0x7FFFFFFF;
+                        double timeOut = (double)outTime / 45000;
+
+                        TSStreamClip streamClip = new TSStreamClip(
+                            streamFile, streamClipFile);
+
+                        streamClip.Name = streamFileName; //TODO
+                        streamClip.TimeIn = timeIn;
+                        streamClip.TimeOut = timeOut;
+                        streamClip.Length = streamClip.TimeOut - streamClip.TimeIn;
+                        streamClip.RelativeTimeIn = TotalLength;
+                        streamClip.RelativeTimeOut = streamClip.RelativeTimeIn + streamClip.Length;
+                        streamClip.RelativeLength = streamClip.Length / TotalLength;
+                        StreamClips.Add(streamClip);
+                        chapterClips.Add(streamClip);
+
+                        pos += 12;
+                        if (multiangle > 0)
+                        {
+                            int angles = data[pos];
+                            pos += 2;
+                            for (int angle = 0; angle < angles - 1; angle++)
+                            {
+                                string angleName = ToolBox.ReadString(data, 5, ref pos);
+                                string angleType = ToolBox.ReadString(data, 4, ref pos);
+                                pos += 1;
+
+                                TSStreamFile angleFile = null;
+                                string angleFileName = string.Format(
+                                    "{0}.M2TS", angleName);
+                                if (streamFiles.ContainsKey(angleFileName))
+                                {
+                                    angleFile = streamFiles[angleFileName];
+                                }
+                                if (angleFile == null)
+                                {
+                                    throw new Exception(string.Format(
+                                        "Playlist {0} referenced missing angle file {1}.",
+                                        FileInfo.Name, angleFileName));
+                                }
+
+                                TSStreamClipFile angleClipFile = null;
+                                string angleClipFileName = string.Format(
+                                    "{0}.CLPI", angleName);
+                                if (streamClipFiles.ContainsKey(angleClipFileName))
+                                {
+                                    angleClipFile = streamClipFiles[angleClipFileName];
+                                }
+                                if (angleClipFile == null)
+                                {
+                                    throw new Exception(string.Format(
+                                        "Playlist {0} referenced missing angle file {1}.",
+                                        FileInfo.Name, angleClipFileName));
+                                }
+
+                                TSStreamClip angleClip =
+                                    new TSStreamClip(angleFile, angleClipFile);
+                                angleClip.AngleIndex = angle + 1;
+                                angleClip.TimeIn = streamClip.TimeIn;
+                                angleClip.TimeOut = streamClip.TimeOut;
+                                angleClip.RelativeTimeIn = streamClip.RelativeTimeIn;
+                                angleClip.RelativeTimeOut = streamClip.RelativeTimeOut;
+                                angleClip.Length = streamClip.Length;
+                                StreamClips.Add(angleClip);
+                            }
+                            if (angles - 1 > AngleCount) AngleCount = angles - 1;
+                        }
+
+                        int streamInfoLength = ReadInt16(data, ref pos);
+                        pos += 2;
+                        int streamCountVideo = data[pos++];
+                        int streamCountAudio = data[pos++];
+                        int streamCountPG = data[pos++];
+                        int streamCountIG = data[pos++];
+                        int streamCountSecondaryAudio = data[pos++];
+                        int streamCountSecondaryVideo = data[pos++];
+                        int streamCountPIP = data[pos++];
+                        pos += 5;
 
 #if DEBUG
-                    Debug.WriteLine(string.Format(
-                        "{0} : {1} -> V:{2} A:{3} PG:{4} IG:{5} 2A:{6} 2V:{7} PIP:{8}",
-                        Name, streamFileName, streamCountVideo, streamCountAudio, streamCountPG, streamCountIG,
-                        streamCountSecondaryAudio, streamCountSecondaryVideo, streamCountPIP));
+                        Debug.WriteLine(string.Format(
+                            "{0} : {1} -> V:{2} A:{3} PG:{4} IG:{5} 2A:{6} 2V:{7} PIP:{8}",
+                            Name, streamFileName, streamCountVideo, streamCountAudio, streamCountPG, streamCountIG,
+                            streamCountSecondaryAudio, streamCountSecondaryVideo, streamCountPIP));
 #endif
 
-                    for (int i = 0; i < streamCountVideo; i++)
-                    {
-                        TSStream stream = CreatePlaylistStream(data, ref pos);
-                        if (stream != null)
+                        for (int i = 0; i < streamCountVideo; i++)
                         {
-                            if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
-                                PlaylistStreams[stream.PID] = stream;
+                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            if (stream != null)
+                            {
+                                if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
+                                    PlaylistStreams[stream.PID] = stream;
+                            }
                         }
-                    }
-                    for (int i = 0; i < streamCountAudio; i++)
-                    {
-                        TSStream stream = CreatePlaylistStream(data, ref pos);
-                        if (stream != null)
+                        for (int i = 0; i < streamCountAudio; i++)
                         {
-                            if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
-                                PlaylistStreams[stream.PID] = stream;
+                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            if (stream != null)
+                            {
+                                if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
+                                    PlaylistStreams[stream.PID] = stream;
+                            }
                         }
-                    }
-                    for (int i = 0; i < streamCountPG; i++)
-                    {
-                        TSStream stream = CreatePlaylistStream(data, ref pos);
-                        if (stream != null)
+                        for (int i = 0; i < streamCountPG; i++)
                         {
-                            if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
-                                PlaylistStreams[stream.PID] = stream;
+                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            if (stream != null)
+                            {
+                                if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
+                                    PlaylistStreams[stream.PID] = stream;
+                            }
                         }
-                    }
-                    for (int i = 0; i < streamCountIG; i++)
-                    {
-                        TSStream stream = CreatePlaylistStream(data, ref pos);
-                        if (stream != null)
+                        for (int i = 0; i < streamCountIG; i++)
                         {
-                            if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
-                                PlaylistStreams[stream.PID] = stream;
+                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            if (stream != null)
+                            {
+                                if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
+                                    PlaylistStreams[stream.PID] = stream;
+                            }
                         }
-                    }
-                    for (int i = 0; i < streamCountSecondaryAudio; i++)
-                    {
-                        TSStream stream = CreatePlaylistStream(data, ref pos);
-                        if (stream != null)
+                        for (int i = 0; i < streamCountSecondaryAudio; i++)
                         {
-                            if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
-                                PlaylistStreams[stream.PID] = stream;
-                        }
+                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            if (stream != null)
+                            {
+                                if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
+                                    PlaylistStreams[stream.PID] = stream;
+                            }
 
-                        pos += 2;
-                    }
-                    for (int i = 0; i < streamCountSecondaryVideo; i++)
-                    {
-                        TSStream stream = CreatePlaylistStream(data, ref pos);
-                        if (stream != null)
-                        {
-                            if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
-                                PlaylistStreams[stream.PID] = stream;
+                            pos += 2;
                         }
+                        for (int i = 0; i < streamCountSecondaryVideo; i++)
+                        {
+                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            if (stream != null)
+                            {
+                                if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
+                                    PlaylistStreams[stream.PID] = stream;
+                            }
 
-                        pos += 6;
+                            pos += 6;
+                        }
+                        /*
+                         * TODO
+                         *
+                        for (int i = 0; i < streamCountPIP; i++)
+                        {
+                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            if (stream != null) PlaylistStreams[stream.PID] = stream;
+                        }
+                        */
+
+                        pos += itemLength - (pos - itemStart) + 2;
                     }
-                    /*
-                     * TODO
-                     *
-                    for (int i = 0; i < streamCountPIP; i++)
+
+                    pos = chaptersOffset + 4;
+
+                    int chapterCount = ReadInt16(data, ref pos);
+
+                    for (int chapterIndex = 0;
+                        chapterIndex < chapterCount;
+                        chapterIndex++)
                     {
-                        TSStream stream = CreatePlaylistStream(data, ref pos);
-                        if (stream != null) PlaylistStreams[stream.PID] = stream;
-                    }
-                    */
+                        int chapterType = data[pos+1];
 
-                    pos += itemLength - (pos - itemStart) + 2;
+                        if (chapterType == 1)
+                        {
+                            int streamFileIndex =
+                                ((int)data[pos + 2] << 8) + data[pos + 3];
+
+                            long chapterTime =
+                                ((long)data[pos + 4] << 24) +
+                                ((long)data[pos + 5] << 16) +
+                                ((long)data[pos + 6] << 8) +
+                                ((long)data[pos + 7]);
+
+                            TSStreamClip streamClip = chapterClips[streamFileIndex];
+
+                            double chapterSeconds = (double)chapterTime / 45000;
+
+                            double relativeSeconds =
+                                chapterSeconds -
+                                streamClip.TimeIn +
+                                streamClip.RelativeTimeIn;
+
+                            // TODO: Ignore short last chapter?
+                            if (TotalLength - relativeSeconds > 1.0)
+                            {
+                                streamClip.Chapters.Add(chapterSeconds);
+                                this.Chapters.Add(relativeSeconds);
+                            }
+                        }
+                        else
+                        {
+                            // TODO: Handle other chapter types?
+                        }
+                        pos += 14;
+                    }
                 }
-
-                pos = chaptersOffset + 4;
-
-                int chapterCount = ReadInt16(data, ref pos);
-
-                for (int chapterIndex = 0;
-                    chapterIndex < chapterCount;
-                    chapterIndex++)
+                finally
                 {
-                    int chapterType = data[pos+1];
-
-                    if (chapterType == 1)
+                    if (data != null)
                     {
-                        int streamFileIndex =
-                            ((int)data[pos + 2] << 8) + data[pos + 3];
-
-                        long chapterTime =
-                            ((long)data[pos + 4] << 24) +
-                            ((long)data[pos + 5] << 16) +
-                            ((long)data[pos + 6] << 8) +
-                            ((long)data[pos + 7]);
-
-                        TSStreamClip streamClip = chapterClips[streamFileIndex];
-
-                        double chapterSeconds = (double)chapterTime / 45000;
-
-                        double relativeSeconds =
-                            chapterSeconds -
-                            streamClip.TimeIn +
-                            streamClip.RelativeTimeIn;
-
-                        // TODO: Ignore short last chapter?
-                        if (TotalLength - relativeSeconds > 1.0)
-                        {
-                            streamClip.Chapters.Add(chapterSeconds);
-                            this.Chapters.Add(relativeSeconds);
-                        }
+                        try { ArrayPool<byte>.Shared.Return(data); } catch { }
                     }
-                    else
-                    {
-                        // TODO: Handle other chapter types?
-                    }
-                    pos += 14;
                 }
             }
             finally

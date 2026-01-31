@@ -19,6 +19,7 @@
 
 #undef DEBUG
 using System.IO;
+using System.Buffers;
 
 namespace BDInfo
 {
@@ -76,8 +77,12 @@ namespace BDInfo
             byte[] sync = buffer.ReadBytes(2);
             if (sync == null || sync[0] != 0x0B || sync[1] != 0x77)
             {
+                if (sync != null) ArrayPool<byte>.Shared.Return(sync);
                 return;
             }
+
+            // release small rented buffer immediately
+            ArrayPool<byte>.Shared.Return(sync);
 
             var secondFrame = stream.ChannelCount > 0;
 
@@ -91,7 +96,10 @@ namespace BDInfo
             uint numBlocks = 0;
 
             byte[] hdr = buffer.ReadBytes(4);
+            if (hdr == null) return;
             uint bsid = (uint)((hdr[3] & 0xF8) >> 3);
+            // release rented header buffer as we only needed bytes from it
+            ArrayPool<byte>.Shared.Return(hdr);
             buffer.Seek(-4, SeekOrigin.Current);
             if (bsid <= 10)
             {
