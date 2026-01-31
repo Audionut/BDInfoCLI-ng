@@ -38,7 +38,7 @@ namespace BDInfo
         {
             get
             {
-                return Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.8.0";
+                return "0.7.6.4 CLI";
             }
         }
 
@@ -113,19 +113,6 @@ namespace BDInfo
                 "{0,-16}{1}\r\n", "BDInfo:",
                 ProductVersion);
 
-            report.Append("\r\n");
-            report.AppendFormat(CultureInfo.InvariantCulture,
-                "{0,-16}{1}\r\n", "Notes:", "");
-            report.Append("\r\n");
-            report.Append("BDINFO HOME:\r\n");
-            report.Append("  Cinema Squid (old)\r\n");
-            report.Append("    http://www.cinemasquid.com/blu-ray/tools/bdinfo\r\n");
-            report.Append("  UniqProject GitHub (new)\r\n");
-            report.Append("   https://github.com/UniqProject/BDInfo\r\n");
-            report.Append("\r\n");
-            report.Append("INCLUDES FORUMS REPORT FOR:\r\n");
-            report.Append("  AVS Forum Blu-ray Audio and Video Specifications Thread\r\n");
-            report.Append("    http://www.avsforum.com/avs-vb/showthread.php?t=1155731\r\n");
             report.Append("\r\n");
 
             if (scanResult.ScanException != null)

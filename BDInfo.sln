@@ -3,21 +3,16 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "bdinfo-cli", "bdinfo-cli\bdinfo-cli.csproj", "{DB6AB628-9D51-47F8-960B-05E9105049EB}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BDInfo", "BDInfo", "{C0D3141C-B224-4033-9F0E-C7260063EA74}"
-EndProject
 Global
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Release|Any CPU = Release|Any CPU
-		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{DB6AB628-9D51-47F8-960B-05E9105049EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DB6AB628-9D51-47F8-960B-05E9105049EB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DB6AB628-9D51-47F8-960B-05E9105049EB}.Release|x64.ActiveCfg = Release|Any CPU
-		{DB6AB628-9D51-47F8-960B-05E9105049EB}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
     

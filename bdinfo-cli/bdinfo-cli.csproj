@@ -10,19 +10,20 @@
 
   <ItemGroup>
     <!-- Include core, non-UI sources from the BDInfo tree -->
-    <Compile Include="..\BDInfo\BDROM\**\*.cs" Exclude="..\BDInfo\BDROM\obj\**\*;..\BDInfo\BDROM\bin\**\*" />
-    <Compile Include="..\BDInfo\BDInfo.Core\**\*.cs" Exclude="..\BDInfo\BDInfo.Core\obj\**\*;..\BDInfo\BDInfo.Core\bin\**\*" />
+    <Compile Include="..\BDInfo\BDROM\**\*.cs" />
+    <Compile Include="..\BDInfo\BDInfo.Core\**\*.cs" />
     <Compile Include="..\BDInfo\ToolBox.cs" />
     <Compile Include="..\BDInfo\Options.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="DiscUtils" Version="0.16.13" />
+    <PackageReference Include="DiscUtils.Udf" Version="0.16.13" />
   </ItemGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
-    <!-- Produce a self-contained single-file Release binary for win-x64 by default -->
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- Produce self-contained single-file Release binaries for all target RIDs -->
+    <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <PublishTrimmed>true</PublishTrimmed>
@@ -35,9 +36,11 @@
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
-    <!-- Remove unwanted native DLLs from the publish output (e.g. lzfse.dll) -->
-    <Target Name="RemoveUnwantedNativeDlls" AfterTargets="Publish">
+    <!-- Remove unwanted native libraries from the publish output (e.g. lzfse) -->
+    <Target Name="RemoveUnwantedNativeLibs" AfterTargets="Publish">
       <Delete Files="$(PublishDir)lzfse.dll" ContinueOnError="true" />
+      <Delete Files="$(PublishDir)liblzfse.so" ContinueOnError="true" />
+      <Delete Files="$(PublishDir)liblzfse.dylib" ContinueOnError="true" />
     </Target>
 
 </Project>

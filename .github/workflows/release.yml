@@ -1,0 +1,141 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: bdinfo-linux-x64
+          - os: ubuntu-latest
+            rid: linux-arm64
+            artifact: bdinfo-linux-arm64
+          - os: windows-latest
+            rid: win-x64
+            artifact: bdinfo-win-x64
+          - os: macos-latest
+            rid: osx-x64
+            artifact: bdinfo-osx-x64
+          - os: macos-latest
+            rid: osx-arm64
+            artifact: bdinfo-osx-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore bdinfo-cli/bdinfo-cli.csproj
+
+      - name: Publish
+        run: dotnet publish bdinfo-cli/bdinfo-cli.csproj -c Release -r ${{ matrix.rid }} -o ./publish/${{ matrix.artifact }}
+
+      - name: Create archive (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cd publish
+          tar -czvf ${{ matrix.artifact }}.tar.gz ${{ matrix.artifact }}
+
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd publish
+          Compress-Archive -Path ${{ matrix.artifact }} -DestinationPath ${{ matrix.artifact }}.zip
+
+      - name: Compute SHA256 checksums (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cd publish
+          for f in ${{ matrix.artifact }}.*; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
+      - name: Compute SHA256 checksums (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Set-Location publish
+          Get-ChildItem -Filter "${{ matrix.artifact }}.*" | ForEach-Object {
+            $h = Get-FileHash -Algorithm SHA256 $_.FullName
+            "{0}  {1}" -f $h.Hash, $_.Name | Out-File -FilePath ($_.FullName + '.sha256') -Encoding ascii
+          }
+
+      - name: Upload artifact + checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: publish/${{ matrix.artifact }}*
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/bdinfo:latest
+            ghcr.io/${{ github.repository_owner }}/bdinfo:${{ github.ref_name }}
+
+  release:
+    needs: [build, docker]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
