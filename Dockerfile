@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
 	dotnet publish bdinfo-cli/bdinfo-cli.csproj -c Release -r ${RID} --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o /app/publish
 
 # Runtime stage: use Debian-based runtime for better compatibility with single-file/ReadyToRun
-FROM mcr.microsoft.com/dotnet/runtime:8.0-bullseye-slim AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:8.0 AS runtime
 
 WORKDIR /app
 COPY --from=build /app/publish .

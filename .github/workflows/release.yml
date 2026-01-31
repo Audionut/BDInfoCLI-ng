@@ -89,7 +89,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: publish/${{ matrix.artifact }}*
+          # Only upload archive and checksum files (avoid uploading the unpacked folder)
+          path: publish/${{ matrix.artifact }}.*
 
   docker:
     needs: build
@@ -145,7 +146,7 @@ jobs:
           # Use the `version` input when manually dispatching, otherwise use the pushed tag name.
           tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
           name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
-          files: artifacts/**/*
+          files: artifacts/**/*.*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
