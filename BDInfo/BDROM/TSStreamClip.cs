@@ -26,7 +26,7 @@ namespace BDInfo
     public class TSStreamClip
     {
         public int AngleIndex = 0;
-        public string Name;
+        public string Name = string.Empty;
         public double TimeIn;
         public double TimeOut;
         public double RelativeTimeIn;
@@ -42,29 +42,34 @@ namespace BDInfo
 
         public List<double> Chapters = new List<double>();
 
-        public TSStreamFile StreamFile = null;
-        public TSStreamClipFile StreamClipFile = null;
+        public TSStreamFile? StreamFile = null;
+        public TSStreamClipFile? StreamClipFile = null;
 
         public TSStreamClip(
-            TSStreamFile streamFile,
-            TSStreamClipFile streamClipFile)
+            TSStreamFile? streamFile,
+            TSStreamClipFile? streamClipFile)
         {
             if (streamFile != null)
             {
-                Name = streamFile.Name;
-                StreamFile = streamFile;
+                TSStreamFile sf = streamFile;
+                Name = sf.Name ?? string.Empty;
+                StreamFile = sf;
 
-                if (StreamFile.FileInfo != null)
-                    FileSize = (ulong) StreamFile.FileInfo.Length;
-                else
-                    FileSize = (ulong) StreamFile.DFileInfo.Length;
-
-                if (StreamFile.InterleavedFile != null)
+                if (sf.FileInfo != null)
                 {
-                    if (StreamFile.InterleavedFile.FileInfo != null)
-                        InterleavedFileSize = (ulong) StreamFile.InterleavedFile.FileInfo.Length;
-                    else
-                        InterleavedFileSize = (ulong) StreamFile.InterleavedFile.DFileInfo.Length;
+                    FileSize = (ulong)sf.FileInfo.Length;
+                }
+                else if (sf.DFileInfo != null)
+                {
+                    FileSize = (ulong)sf.DFileInfo.Length;
+                }
+
+                if (sf.InterleavedFile != null)
+                {
+                    if (sf.InterleavedFile.FileInfo != null)
+                        InterleavedFileSize = (ulong)sf.InterleavedFile.FileInfo.Length;
+                    else if (sf.InterleavedFile.DFileInfo != null)
+                        InterleavedFileSize = (ulong)sf.InterleavedFile.DFileInfo.Length;
                 }
             }
             StreamClipFile = streamClipFile;
@@ -78,7 +83,7 @@ namespace BDInfo
                     StreamFile.InterleavedFile != null &&
                     BDInfoSettings.EnableSSIF)
                 {
-                    return StreamFile.InterleavedFile.Name;
+                    return StreamFile.InterleavedFile.Name ?? Name;
                 }
                 return Name;
             }
@@ -106,11 +111,11 @@ namespace BDInfo
 
         public bool IsCompatible(TSStreamClip clip)
         {
+            if (StreamFile == null || clip.StreamFile == null) return false;
             foreach (TSStream stream1 in StreamFile.Streams.Values)
             {
-                if (clip.StreamFile.Streams.ContainsKey(stream1.PID))
+                if (clip.StreamFile.Streams.TryGetValue(stream1.PID, out TSStream? stream2))
                 {
-                    TSStream stream2 = clip.StreamFile.Streams[stream1.PID];
                     if (stream1.StreamType != stream2.StreamType)
                     {
                         return false;

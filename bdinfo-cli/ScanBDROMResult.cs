@@ -5,7 +5,7 @@ namespace BDInfo
 {
     public class ScanBDROMResult
     {
-        public Exception ScanException { get; set; } = null!;
+        public Exception? ScanException { get; set; }
         public Dictionary<string, Exception> FileExceptions { get; } = new Dictionary<string, Exception>();
     }
 }

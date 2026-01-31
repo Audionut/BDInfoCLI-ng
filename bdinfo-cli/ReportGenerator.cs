@@ -49,16 +49,17 @@ namespace BDInfo
             BDROM BDROM,
             List<TSPlaylistFile> playlists,
             ScanBDROMResult scanResult,
-            string savePath = null)
+            string? savePath = null)
         {
-            StreamWriter reportFile = null;
+            StreamWriter? reportFile = null;
             if (BDInfoSettings.AutosaveReport || savePath != null)
             {
                 string reportName = string.Format(CultureInfo.InvariantCulture,
                     "BDINFO.{0}.txt",
                     BDROM.VolumeLabel);
 
-                reportFile = File.CreateText(Path.Combine(savePath, reportName));
+                string basePath = savePath ?? Environment.CurrentDirectory;
+                reportFile = File.CreateText(Path.Combine(basePath, reportName));
             }
 
             StringBuilder report = new StringBuilder(32768);
@@ -140,7 +141,7 @@ namespace BDInfo
             {
                 StringBuilder summary = new StringBuilder(4096);
 
-                string title = playlist.Name;
+                string title = playlist.Name ?? string.Empty;
                 string discSize = string.Format(CultureInfo.InvariantCulture,
                     "{0:N0}", BDROM.Size);
 
@@ -697,8 +698,8 @@ namespace BDInfo
 
                 while (chapterIndex < playlist.Chapters.Count)
                 {
-                    TSStreamClip clip = null;
-                    TSStreamFile file = null;
+                    TSStreamClip? clip = null;
+                    TSStreamFile? file = null;
 
                     if (clipIndex < playlist.StreamClips.Count)
                     {
@@ -718,7 +719,7 @@ namespace BDInfo
                     }
                     double chapterLength = chapterEnd - chapterStart;
 
-                    List<TSStreamDiagnostics> diagList = null;
+                    List<TSStreamDiagnostics>? diagList = null;
 
                     if (clip != null &&
                         clip.AngleIndex == 0 &&

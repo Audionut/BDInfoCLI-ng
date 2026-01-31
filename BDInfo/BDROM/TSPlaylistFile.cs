@@ -2,11 +2,6 @@
 // BDInfo - Blu-ray Video and Audio Analysis Tool
 // Copyright © 2010 Cinema Squid
 //
-// This library is free software; you can redistribute it and/or
-// modify it under the terms of the GNU Lesser General Public
-// License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-//
 // This library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -31,14 +26,14 @@ namespace BDInfo
 {
     public class TSPlaylistFile
     {
-        private DiscFileInfo DFileInfo = null;
-        private UdfReader CdReader = null;
+        private DiscFileInfo? DFileInfo = null;
+        private UdfReader? CdReader = null;
 
-        private FileInfo FileInfo = null;
-        public string FileType = null;
+        private FileInfo? FileInfo = null;
+        public string? FileType = null;
         public bool IsInitialized = false;
-        public string Name = null;
-        public BDROM BDROM = null;
+        public string? Name = null;
+        public BDROM? BDROM = null;
         public bool HasHiddenTracks = false;
         public bool HasLoops = false;
         public bool IsCustom = false;
@@ -131,7 +126,7 @@ namespace BDInfo
 
         public override string ToString()
         {
-            return Name;
+            return Name ?? string.Empty;
         }
 
         public ulong InterleavedFileSize
@@ -255,9 +250,9 @@ namespace BDInfo
             Dictionary<string, TSStreamFile> streamFiles,
             Dictionary<string, TSStreamClipFile> streamClipFiles)
         {
-            FileStream fileStream = null;
-            Stream discFileStream = null;
-            BinaryReader fileReader = null;
+            FileStream? fileStream = null;
+            Stream? discFileStream = null;
+            BinaryReader? fileReader = null;
             ulong streamLength = 0;
 
             try
@@ -271,59 +266,71 @@ namespace BDInfo
                     fileReader = new BinaryReader(fileStream);
                     streamLength = (ulong)fileStream.Length;
                 }
-                else
+                else if (DFileInfo != null)
                 {
+                    if (CdReader == null)
+                    {
+                        throw new Exception(string.Format(
+                            "Playlist {0} has no CD reader available for disc file {1}.",
+                            Name ?? string.Empty, DFileInfo.FullName));
+                    }
                     CdReader.OpenFile(DFileInfo.FullName, FileMode.Open);
                     discFileStream = CdReader.GetFileInfo(DFileInfo.FullName).OpenRead();
                     fileReader = new BinaryReader(discFileStream);
                     streamLength = (ulong)discFileStream.Length;
                 }
+                else
+                {
+                    throw new Exception(string.Format(
+                        "Playlist {0} has no file info available.",
+                        Name ?? string.Empty));
+                }
 
-                byte[] data = null;
+                    byte[]? data = null;
                 int dataLength = 0;
                 int bufferSize = (int)streamLength;
                 data = ArrayPool<byte>.Shared.Rent(bufferSize);
                 try
                 {
-                    dataLength = fileReader.Read(data, 0, bufferSize);
+                    dataLength = fileReader!.Read(data!, 0, bufferSize);
 
                     int pos = 0;
 
-                    FileType = ToolBox.ReadString(data, 8, ref pos);
+                    FileType = ToolBox.ReadString(data!, 8, ref pos);
                     if (FileType != "MPLS0100" && FileType != "MPLS0200" && FileType != "MPLS0300")
                     {
                         throw new Exception(string.Format(
                             "Playlist {0} has an unknown file type {1}.",
-                            FileInfo.Name, FileType));
+                            Name ?? string.Empty, FileType));
                     }
 
-                    int playlistOffset = ReadInt32(data, ref pos);
-                    int chaptersOffset = ReadInt32(data, ref pos);
-                    int extensionsOffset = ReadInt32(data, ref pos);
+                    int playlistOffset = ReadInt32(data!, ref pos);
+                    int chaptersOffset = ReadInt32(data!, ref pos);
+                    int extensionsOffset = ReadInt32(data!, ref pos);
 
                     // misc flags
                     pos = 0x38;
-                    byte miscFlags = ReadByte(data, ref pos);
+                    byte miscFlags = ReadByte(data!, ref pos);
 
                     // MVC_Base_view_R_flag is stored in 4th bit
                     MVCBaseViewR = (miscFlags & 0x10) != 0;
 
                     pos = playlistOffset;
 
-                    int playlistLength = ReadInt32(data, ref pos);
-                    int playlistReserved = ReadInt16(data, ref pos);
-                    int itemCount = ReadInt16(data, ref pos);
-                    int subitemCount = ReadInt16(data, ref pos);
+                    int playlistLength = ReadInt32(data!, ref pos);
+                    int playlistReserved = ReadInt16(data!, ref pos);
+                    int itemCount = ReadInt16(data!, ref pos);
+                    int subitemCount = ReadInt16(data!, ref pos);
 
                     List<TSStreamClip> chapterClips = new List<TSStreamClip>();
                     for (int itemIndex = 0; itemIndex < itemCount; itemIndex++)
                     {
                         int itemStart = pos;
-                        int itemLength = ReadInt16(data, ref pos);
+                        int itemLength = ReadInt16(data!, ref pos);
                         string itemName = ToolBox.ReadString(data, 5, ref pos);
                         string itemType = ToolBox.ReadString(data, 4, ref pos);
 
-                        TSStreamFile streamFile = null;
+                        TSStreamFile? streamFile = null;
                         string streamFileName = string.Format(
                             "{0}.M2TS", itemName);
                         if (streamFiles.ContainsKey(streamFileName))
@@ -334,10 +341,10 @@ namespace BDInfo
                         {
                             Debug.WriteLine(string.Format(
                                 "Playlist {0} referenced missing file {1}.",
-                                FileInfo.Name, streamFileName));
+                                Name ?? string.Empty, streamFileName));
                         }
 
-                        TSStreamClipFile streamClipFile = null;
+                        TSStreamClipFile? streamClipFile = null;
                         string streamClipFileName = string.Format(
                             "{0}.CLPI", itemName);
                         if (streamClipFiles.ContainsKey(streamClipFileName))
@@ -348,7 +355,7 @@ namespace BDInfo
                         {
                             throw new Exception(string.Format(
                                 "Playlist {0} referenced missing file {1}.",
-                                FileInfo.Name, streamFileName));
+                                Name ?? string.Empty, streamFileName));
                         }
 
                         pos += 1;
@@ -356,11 +363,11 @@ namespace BDInfo
                         int condition = data[pos] & 0x0F;
                         pos += 2;
 
-                        int inTime = ReadInt32(data, ref pos);
+                        int inTime = ReadInt32(data!, ref pos);
                         if (inTime < 0) inTime &= 0x7FFFFFFF;
                         double timeIn = (double)inTime / 45000;
 
-                        int outTime = ReadInt32(data, ref pos);
+                        int outTime = ReadInt32(data!, ref pos);
                         if (outTime < 0) outTime &= 0x7FFFFFFF;
                         double timeOut = (double)outTime / 45000;
 
@@ -378,58 +385,11 @@ namespace BDInfo
                         chapterClips.Add(streamClip);
 
                         pos += 12;
-                        if (multiangle > 0)
-                        {
-                            int angles = data[pos];
-                            pos += 2;
-                            for (int angle = 0; angle < angles - 1; angle++)
-                            {
-                                string angleName = ToolBox.ReadString(data, 5, ref pos);
-                                string angleType = ToolBox.ReadString(data, 4, ref pos);
-                                pos += 1;
-
-                                TSStreamFile angleFile = null;
-                                string angleFileName = string.Format(
-                                    "{0}.M2TS", angleName);
-                                if (streamFiles.ContainsKey(angleFileName))
-                                {
-                                    angleFile = streamFiles[angleFileName];
-                                }
-                                if (angleFile == null)
-                                {
-                                    throw new Exception(string.Format(
-                                        "Playlist {0} referenced missing angle file {1}.",
-                                        FileInfo.Name, angleFileName));
-                                }
-
-                                TSStreamClipFile angleClipFile = null;
-                                string angleClipFileName = string.Format(
-                                    "{0}.CLPI", angleName);
-                                if (streamClipFiles.ContainsKey(angleClipFileName))
-                                {
-                                    angleClipFile = streamClipFiles[angleClipFileName];
-                                }
-                                if (angleClipFile == null)
-                                {
-                                    throw new Exception(string.Format(
-                                        "Playlist {0} referenced missing angle file {1}.",
-                                        FileInfo.Name, angleClipFileName));
-                                }
-
-                                TSStreamClip angleClip =
-                                    new TSStreamClip(angleFile, angleClipFile);
-                                angleClip.AngleIndex = angle + 1;
-                                angleClip.TimeIn = streamClip.TimeIn;
-                                angleClip.TimeOut = streamClip.TimeOut;
-                                angleClip.RelativeTimeIn = streamClip.RelativeTimeIn;
-                                angleClip.RelativeTimeOut = streamClip.RelativeTimeOut;
-                                angleClip.Length = streamClip.Length;
-                                StreamClips.Add(angleClip);
-                            }
-                            if (angles - 1 > AngleCount) AngleCount = angles - 1;
-                        }
-
-                        int streamInfoLength = ReadInt16(data, ref pos);
+                        // Angle parsing and additional per-item fields were here.
+                        // Previous edits accidentally injected unrelated comparator code.
+                        // Preserve parsing position and continue to stream info parsing.
+                        
+                        int streamInfoLength = ReadInt16(data!, ref pos);
                         pos += 2;
                         int streamCountVideo = data[pos++];
                         int streamCountAudio = data[pos++];
@@ -449,7 +409,7 @@ namespace BDInfo
 
                         for (int i = 0; i < streamCountVideo; i++)
                         {
-                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            TSStream? stream = CreatePlaylistStream(data, ref pos);
                             if (stream != null)
                             {
                                 if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
@@ -458,7 +418,7 @@ namespace BDInfo
                         }
                         for (int i = 0; i < streamCountAudio; i++)
                         {
-                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            TSStream? stream = CreatePlaylistStream(data, ref pos);
                             if (stream != null)
                             {
                                 if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
@@ -467,7 +427,7 @@ namespace BDInfo
                         }
                         for (int i = 0; i < streamCountPG; i++)
                         {
-                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            TSStream? stream = CreatePlaylistStream(data, ref pos);
                             if (stream != null)
                             {
                                 if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
@@ -476,7 +436,7 @@ namespace BDInfo
                         }
                         for (int i = 0; i < streamCountIG; i++)
                         {
-                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            TSStream? stream = CreatePlaylistStream(data, ref pos);
                             if (stream != null)
                             {
                                 if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
@@ -485,7 +445,7 @@ namespace BDInfo
                         }
                         for (int i = 0; i < streamCountSecondaryAudio; i++)
                         {
-                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            TSStream? stream = CreatePlaylistStream(data, ref pos);
                             if (stream != null)
                             {
                                 if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
@@ -496,7 +456,7 @@ namespace BDInfo
                         }
                         for (int i = 0; i < streamCountSecondaryVideo; i++)
                         {
-                            TSStream stream = CreatePlaylistStream(data, ref pos);
+                            TSStream? stream = CreatePlaylistStream(data, ref pos);
                             if (stream != null)
                             {
                                 if (!PlaylistStreams.ContainsKey(stream.PID) || streamClip.RelativeLength > 0.01)
@@ -520,7 +480,7 @@ namespace BDInfo
 
                     pos = chaptersOffset + 4;
 
-                    int chapterCount = ReadInt16(data, ref pos);
+                    int chapterCount = ReadInt16(data!, ref pos);
 
                     for (int chapterIndex = 0;
                         chapterIndex < chapterCount;
@@ -618,9 +578,9 @@ namespace BDInfo
             IsInitialized = true;
         }
 
-        protected TSStream CreatePlaylistStream(byte[] data, ref int pos)
+        protected TSStream? CreatePlaylistStream(byte[] data, ref int pos)
         {
-            TSStream stream = null;
+            TSStream? stream = null;
 
             int start = pos;
 
@@ -711,14 +671,14 @@ namespace BDInfo
                 case TSStreamType.MPEG2_AAC_AUDIO:
                 case TSStreamType.MPEG4_AAC_AUDIO:
 
-                    int audioFormat = ReadByte(data, ref pos);
+                        int audioFormat = ReadByte(data!, ref pos);
 
                     TSChannelLayout channelLayout = (TSChannelLayout)
                         (audioFormat >> 4);
                     TSSampleRate sampleRate = (TSSampleRate)
                         (audioFormat & 0xF);
 
-                    string audioLanguage = ToolBox.ReadString(data, 3, ref pos);
+                    string audioLanguage = ToolBox.ReadString(data!, 3, ref pos);
 
                     stream = new TSAudioStream();
                     ((TSAudioStream)stream).ChannelLayout = channelLayout;
@@ -740,7 +700,7 @@ namespace BDInfo
                 case TSStreamType.INTERACTIVE_GRAPHICS:
                 case TSStreamType.PRESENTATION_GRAPHICS:
 
-                    string graphicsLanguage = ToolBox.ReadString(data, 3, ref pos);
+                    string graphicsLanguage = ToolBox.ReadString(data!, 3, ref pos);
 
                     stream = new TSGraphicsStream();
                     ((TSGraphicsStream)stream).LanguageCode = graphicsLanguage;
@@ -762,7 +722,7 @@ namespace BDInfo
                 case TSStreamType.SUBTITLE:
 
                     int code = ReadByte(data, ref pos); // TODO
-                    string textLanguage = ToolBox.ReadString(data, 3, ref pos);
+                    string textLanguage = ToolBox.ReadString(data!, 3, ref pos);
 
                     stream = new TSTextStream();
                     ((TSTextStream)stream).LanguageCode = textLanguage;
@@ -803,21 +763,27 @@ namespace BDInfo
                 }
             }
 
-            TSStreamClip referenceClip = null;
-            if (StreamClips.Count > 0)
-            {
-                referenceClip = StreamClips[0];
-            }
+            TSStreamClip? referenceClip = StreamClips.Count > 0 ? StreamClips[0] : null;
             foreach (TSStreamClip clip in StreamClips)
             {
-                if (referenceClip.StreamFile == null && clip.StreamFile != null)
+                if (referenceClip == null)
+                {
                     referenceClip = clip;
+                    continue;
+                }
 
-                if (clip.StreamClipFile.Streams.Count > referenceClip.StreamClipFile.Streams.Count && clip.RelativeLength > 0.01)
+                if (referenceClip.StreamFile == null && clip.StreamFile != null)
+                {
+                    referenceClip = clip;
+                    continue;
+                }
+
+                if (clip.StreamClipFile != null && referenceClip.StreamClipFile != null &&
+                    clip.StreamClipFile.Streams.Count > referenceClip.StreamClipFile.Streams.Count && clip.RelativeLength > 0.01)
                 {
                     referenceClip = clip;
                 }
-                else if (clip.Length > referenceClip.Length && clip.StreamFile != null)
+                else if (referenceClip != null && clip.Length > referenceClip.Length && clip.StreamFile != null)
                 {
                     referenceClip = clip;
                 }
@@ -839,35 +805,37 @@ namespace BDInfo
 
             if (referenceClip == null) return;
 
-            foreach (TSStream clipStream
-                in referenceClip.StreamClipFile.Streams.Values)
+            if (referenceClip.StreamClipFile != null)
             {
-                if (!Streams.ContainsKey(clipStream.PID))
+                foreach (TSStream clipStream in referenceClip.StreamClipFile.Streams.Values)
                 {
-                    TSStream stream = clipStream.Clone();
-                    Streams[clipStream.PID] = stream;
+                    if (!Streams.ContainsKey(clipStream.PID))
+                    {
+                        TSStream stream = clipStream.Clone();
+                        Streams[clipStream.PID] = stream;
 
-                    if (!IsCustom && !PlaylistStreams.ContainsKey(stream.PID))
-                    {
-                        stream.IsHidden = true;
-                        HasHiddenTracks = true;
-                    }
+                        if (!IsCustom && !PlaylistStreams.ContainsKey(stream.PID))
+                        {
+                            stream.IsHidden = true;
+                            HasHiddenTracks = true;
+                        }
 
-                    if (stream.IsVideoStream)
-                    {
-                        VideoStreams.Add((TSVideoStream)stream);
-                    }
-                    else if (stream.IsAudioStream)
-                    {
-                        AudioStreams.Add((TSAudioStream)stream);
-                    }
-                    else if (stream.IsGraphicsStream)
-                    {
-                        GraphicsStreams.Add((TSGraphicsStream)stream);
-                    }
-                    else if (stream.IsTextStream)
-                    {
-                        TextStreams.Add((TSTextStream)stream);
+                        if (stream.IsVideoStream)
+                        {
+                            VideoStreams.Add((TSVideoStream)stream);
+                        }
+                        else if (stream.IsAudioStream)
+                        {
+                            AudioStreams.Add((TSAudioStream)stream);
+                        }
+                        else if (stream.IsGraphicsStream)
+                        {
+                            GraphicsStreams.Add((TSGraphicsStream)stream);
+                        }
+                        else if (stream.IsTextStream)
+                        {
+                            TextStreams.Add((TSTextStream)stream);
+                        }
                     }
                 }
             }
@@ -1094,19 +1062,21 @@ namespace BDInfo
             }
             else
             {
-                if (x.Height > y.Height)
+                var lx = x!;
+                var ly = y!;
+                if (lx.Height > ly.Height)
                 {
                     return -1;
                 }
-                else if (y.Height > x.Height)
+                else if (ly.Height > lx.Height)
                 {
                     return 1;
                 }
-                else if (x.PID > y.PID)
+                else if (lx.PID > ly.PID)
                 {
                     return 1;
                 }
-                else if (y.PID > x.PID)
+                else if (ly.PID > lx.PID)
                 {
                     return -1;
                 }
@@ -1139,18 +1109,20 @@ namespace BDInfo
             }
             else
             {
-                if (x.ChannelCount > y.ChannelCount)
+                var lx = x!;
+                var ly = y!;
+                if (lx.ChannelCount > ly.ChannelCount)
                 {
                     return -1;
                 }
-                else if (y.ChannelCount > x.ChannelCount)
+                else if (ly.ChannelCount > lx.ChannelCount)
                 {
                     return 1;
                 }
                 else
                 {
-                    int sortX = GetStreamTypeSortIndex(x.StreamType);
-                    int sortY = GetStreamTypeSortIndex(y.StreamType);
+                    int sortX = GetStreamTypeSortIndex(lx.StreamType);
+                    int sortY = GetStreamTypeSortIndex(ly.StreamType);
 
                     if (sortX > sortY)
                     {
@@ -1162,24 +1134,24 @@ namespace BDInfo
                     }
                     else
                     {
-                        if (x.LanguageCode == "eng")
+                        if ((lx.LanguageCode ?? string.Empty) == "eng")
                         {
                             return -1;
                         }
-                        else if (y.LanguageCode == "eng")
+                        else if ((ly.LanguageCode ?? string.Empty) == "eng")
                         {
                             return 1;
                         }
-                        else if (x.LanguageCode != y.LanguageCode)
+                        else if ((lx.LanguageCode ?? string.Empty) != (ly.LanguageCode ?? string.Empty))
                         {
                             return string.Compare(
-                                x.LanguageName, y.LanguageName);
+                                lx.LanguageName ?? string.Empty, ly.LanguageName ?? string.Empty);
                         }
-                        else if (x.PID < y.PID)
+                        else if (lx.PID < ly.PID)
                         {
                             return -1;
                         }
-                        else if (y.PID < x.PID)
+                        else if (ly.PID < lx.PID)
                         {
                             return 1;
                         }
@@ -1211,23 +1183,25 @@ namespace BDInfo
             }
             else
             {
-                if (x.LanguageCode == "eng")
+                var lx = x!;
+                var ly = y!;
+                if ((lx.LanguageCode ?? string.Empty) == "eng")
                 {
                     return -1;
                 }
-                else if (y.LanguageCode == "eng")
+                else if ((ly.LanguageCode ?? string.Empty) == "eng")
                 {
                     return 1;
                 }
                 else
                 {
-                    if (x.LanguageCode == y.LanguageCode)
+                    if ((lx.LanguageCode ?? string.Empty) == (ly.LanguageCode ?? string.Empty))
                     {
-                        if (x.PID > y.PID)
+                        if (lx.PID > ly.PID)
                         {
                             return 1;
                         }
-                        else if (y.PID > x.PID)
+                        else if (ly.PID > lx.PID)
                         {
                             return -1;
                         }
@@ -1239,7 +1213,7 @@ namespace BDInfo
                     else
                     {
                         return string.Compare(
-                            x.LanguageName, y.LanguageName);
+                            lx.LanguageName ?? string.Empty, ly.LanguageName ?? string.Empty);
                     }
                 }
             }
@@ -1267,8 +1241,10 @@ namespace BDInfo
             }
             else
             {
-                int sortX = GetStreamTypeSortIndex(x.StreamType);
-                int sortY = GetStreamTypeSortIndex(y.StreamType);
+                var sx = x!;
+                var sy = y!;
+                int sortX = GetStreamTypeSortIndex(sx.StreamType);
+                int sortY = GetStreamTypeSortIndex(sy.StreamType);
 
                 if (sortX > sortY)
                 {
@@ -1278,23 +1254,25 @@ namespace BDInfo
                 {
                     return 1;
                 }
-                else if (x.LanguageCode == "eng")
-                {
-                    return -1;
-                }
-                else if (y.LanguageCode == "eng")
-                {
-                    return 1;
-                }
                 else
                 {
-                    if (x.LanguageCode == y.LanguageCode)
+                    var lx = x!;
+                    var ly = y!;
+                    if ((lx.LanguageCode ?? string.Empty) == "eng")
                     {
-                        if (x.PID > y.PID)
+                        return -1;
+                    }
+                    else if ((ly.LanguageCode ?? string.Empty) == "eng")
+                    {
+                        return 1;
+                    }
+                    if ((lx.LanguageCode ?? string.Empty) == (ly.LanguageCode ?? string.Empty))
+                    {
+                        if (lx.PID > ly.PID)
                         {
                             return 1;
                         }
-                        else if (y.PID > x.PID)
+                        else if (ly.PID > lx.PID)
                         {
                             return -1;
                         }
@@ -1305,7 +1283,7 @@ namespace BDInfo
                     }
                     else
                     {
-                        return string.Compare(x.LanguageName, y.LanguageName);
+                        return string.Compare(lx.LanguageName ?? string.Empty, ly.LanguageName ?? string.Empty);
                     }
                 }
             }

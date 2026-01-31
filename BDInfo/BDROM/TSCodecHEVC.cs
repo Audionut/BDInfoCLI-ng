@@ -437,24 +437,24 @@ namespace BDInfo
         private static bool _generalInterlacedSourceFlag;
         private static bool _generalFrameOnlyConstraintFlag;
 
-        public static ExtendedDataSet ExtendedData;
+        public static ExtendedDataSet? ExtendedData = null;
 
-        public static List<VideoParamSetStruct> VideoParamSets;
-        public static List<VUIParametersStruct> VUIParameterSets;
-        public static List<SeqParameterSetStruct> SeqParameterSets;
-        public static List<PicParameterSetStruct> PicParameterSets;
+        public static List<VideoParamSetStruct> VideoParamSets = new List<VideoParamSetStruct>();
+        public static List<VUIParametersStruct> VUIParameterSets = new List<VUIParametersStruct>();
+        public static List<SeqParameterSetStruct> SeqParameterSets = new List<SeqParameterSetStruct>();
+        public static List<PicParameterSetStruct> PicParameterSets = new List<PicParameterSetStruct>();
 
-        public static string MasteringDisplayColorPrimaries;
-        public static string MasteringDisplayLuminance;
-        public static uint MaximumContentLightLevel;
-        public static uint MaximumFrameAverageLightLevel;
+        public static string? MasteringDisplayColorPrimaries = null;
+        public static string? MasteringDisplayLuminance = null;
+        public static uint MaximumContentLightLevel = 0;
+        public static uint MaximumFrameAverageLightLevel = 0;
 
-        public static List<string> ExtendedFormatInfo;
-        public static bool LightLevelAvailable;
+        public static List<string> ExtendedFormatInfo = new List<string>();
+        public static bool LightLevelAvailable = false;
 
-        public static byte PreferredTransferCharacteristics;
+        public static byte PreferredTransferCharacteristics = 0;
 
-        public static bool IsHdr10Plus;
+        public static bool IsHdr10Plus = false;
 
         private static bool _firstSliceSegmentInPicFlag;
         private static uint _slicePicParameterSetId;
@@ -470,10 +470,11 @@ namespace BDInfo
 
             ExtendedData = (ExtendedDataSet)stream.ExtendedData;
 
-            VideoParamSets = ExtendedData.VideoParamSets;
-            VUIParameterSets = ExtendedData.VUIParameterSets;
-            SeqParameterSets = ExtendedData.SeqParameterSets;
-            PicParameterSets = ExtendedData.PicParameterSets;
+            // ensure collections are non-null (ExtendedData ctor sets these, but be defensive)
+            VideoParamSets = ExtendedData.VideoParamSets ?? new List<VideoParamSetStruct>();
+            VUIParameterSets = ExtendedData.VUIParameterSets ?? new List<VUIParametersStruct>();
+            SeqParameterSets = ExtendedData.SeqParameterSets ?? new List<SeqParameterSetStruct>();
+            PicParameterSets = ExtendedData.PicParameterSets ?? new List<PicParameterSetStruct>();
 
             MasteringDisplayColorPrimaries = ExtendedData.MasteringDisplayColorPrimaries;
             MasteringDisplayLuminance = ExtendedData.MasteringDisplayLuminance;
@@ -486,6 +487,7 @@ namespace BDInfo
             PreferredTransferCharacteristics = ExtendedData.PreferredTransferCharacteristics;
 
             ExtendedFormatInfo = ExtendedData.ExtendedFormatInfo;
+            ExtendedFormatInfo ??= new List<string>();
 
             bool frameTypeRead = false;
 
@@ -548,7 +550,7 @@ namespace BDInfo
                         case 20:
                         case 21:
                             tag = SliceSegmentLayer(buffer, nalUnitType);
-                            frameTypeRead = tag != null;
+                                frameTypeRead = !string.IsNullOrEmpty(tag);
                             break;
                         case 32:
                                 VideoParameterSet(buffer);
@@ -660,31 +662,33 @@ namespace BDInfo
                     if (seqParameterSet.BitDepthLumaMinus8 == seqParameterSet.BitDepthChromaMinus8)
                         ExtendedFormatInfo.Add($"{seqParameterSet.BitDepthLumaMinus8 + 8} bits");
 
+                    var vuiForChecks = seqParameterSet.VUIParameters;
                     if (seqParameterSet.BitDepthLumaMinus8 + 8 == 10 &&                 // 10 bit
                         seqParameterSet.ChromaFormatIDC == 1 &&                         // ChromaFormat 4:2:0
-                        seqParameterSet.VUIParameters.VideoSignalTypePresentFlag &&
-                        seqParameterSet.VUIParameters.ColourDescriptionPresentFlag &&
-                        seqParameterSet.VUIParameters.ColourPrimaries == 9 &&           //ColourPrimaries BT.2020
-                        seqParameterSet.VUIParameters.TransferCharacteristics == 16 &&  //TransferCharacteristics PQ
-                        (seqParameterSet.VUIParameters.MatrixCoefficients == 9 ||       //MatrixCoefficients BT.2020 non-constant
-                        seqParameterSet.VUIParameters.MatrixCoefficients == 10) &&      //MatrixCoefficients BT.2020 constant
+                        (vuiForChecks?.VideoSignalTypePresentFlag == true) &&
+                        (vuiForChecks?.ColourDescriptionPresentFlag == true) &&
+                        (vuiForChecks?.ColourPrimaries == 9) &&           //ColourPrimaries BT.2020
+                        (vuiForChecks?.TransferCharacteristics == 16) &&  //TransferCharacteristics PQ
+                        ((vuiForChecks?.MatrixCoefficients == 9) ||       //MatrixCoefficients BT.2020 non-constant
+                        (vuiForChecks?.MatrixCoefficients == 10)) &&      //MatrixCoefficients BT.2020 constant
                         !string.IsNullOrEmpty(MasteringDisplayColorPrimaries))
                     {
                         ExtendedFormatInfo.Add(stream.PID >= 4117 ? "Dolby Vision" : IsHdr10Plus ? "HDR10+" : "HDR10");
                     }
 
-                    if (seqParameterSet.VUIParameters.VideoSignalTypePresentFlag)
+                    var vui = seqParameterSet.VUIParameters;
+                    if (vui?.VideoSignalTypePresentFlag == true)
                     {
                         if (BDInfoSettings.ExtendedStreamDiagnostics)
-                            ExtendedFormatInfo.Add(seqParameterSet.VUIParameters.VideoFullRangeFlag == 1 ? "Full Range" : "Limited Range");
+                            ExtendedFormatInfo.Add(vui.VideoFullRangeFlag == 1 ? "Full Range" : "Limited Range");
 
-                        if (seqParameterSet.VUIParameters.ColourDescriptionPresentFlag)
+                        if (vui.ColourDescriptionPresentFlag)
                         {
-                            ExtendedFormatInfo.Add(ColourPrimaries(seqParameterSet.VUIParameters.ColourPrimaries));
+                            ExtendedFormatInfo.Add(ColourPrimaries(vui.ColourPrimaries));
                             if (BDInfoSettings.ExtendedStreamDiagnostics)
                             {
-                                ExtendedFormatInfo.Add(TransferCharacteristics(seqParameterSet.VUIParameters.TransferCharacteristics));
-                                ExtendedFormatInfo.Add(MatrixCoefficients(seqParameterSet.VUIParameters.MatrixCoefficients));
+                                ExtendedFormatInfo.Add(TransferCharacteristics(vui.TransferCharacteristics));
+                                ExtendedFormatInfo.Add(MatrixCoefficients(vui.MatrixCoefficients));
 
                             }
                         }
@@ -719,7 +723,7 @@ namespace BDInfo
         {
             bool tempBool;
 
-            string tag = null;
+            string tag = string.Empty;
 
             // slice headers
             bool dependentSliceSegmentFlag = false;
@@ -809,8 +813,8 @@ namespace BDInfo
                 if (vpsNumHRDParameters > 1024) vpsNumHRDParameters = 0;
                 for (var hrdPos = 0; hrdPos < vpsNumHRDParameters; hrdPos++)
                 {
-                    XXLCommon xxlCommon = null;
-                    XXL nal = null, vcl = null;
+                    XXLCommon xxlCommon = new XXLCommon();
+                    XXL nal = new XXL(), vcl = new XXL();
 
                     buffer.SkipExp(true); //hrd_layer_sed_idx
                     var cprmsPresentFlag = hrdPos <= 0 || buffer.ReadBool(true);
@@ -1157,7 +1161,7 @@ namespace BDInfo
                 SeiMessageBufferingPeriodXXL(buffer, seqParameterSetItem.VUIParameters?.XXLCommon, irapCPBParamsPresentFlag, seqParameterSetItem.VUIParameters?.VCL, payloadSize);
         }
 
-        private static void SeiMessageBufferingPeriodXXL(TSStreamBuffer buffer, XXLCommon xxlCommon, bool irapCPBParamsPresentFlag, XXL xxl, uint payloadSize)
+        private static void SeiMessageBufferingPeriodXXL(TSStreamBuffer buffer, XXLCommon? xxlCommon, bool irapCPBParamsPresentFlag, XXL? xxl, uint payloadSize)
         {
             if (xxlCommon == null || xxl == null)
             {
@@ -1195,13 +1199,15 @@ namespace BDInfo
             }
             if (seqParameterSetItem.CpbDpbDelaysPresentFlag)
             {
-                byte auCPBRemovalDelayLengthMinus1 = (byte) seqParameterSetItem.VUIParameters.XXLCommon.AUCPBRemovalDelayLengthMinus1;
-                byte dpbOutputDelayLengthMinus1 = (byte) seqParameterSetItem.VUIParameters.XXLCommon.DPBOutputDelayLengthMinus1;
-                bool subPicHRDParamsPresentFlag = seqParameterSetItem.VUIParameters.XXLCommon.SubPicHRDParamsPresentFlag;
+                var vui = seqParameterSetItem.VUIParameters;
+                var xxlCommon = vui!.XXLCommon!;
+                byte auCPBRemovalDelayLengthMinus1 = (byte) xxlCommon.AUCPBRemovalDelayLengthMinus1;
+                byte dpbOutputDelayLengthMinus1 = (byte) xxlCommon.DPBOutputDelayLengthMinus1;
+                bool subPicHRDParamsPresentFlag = xxlCommon.SubPicHRDParamsPresentFlag;
                 buffer.BSSkipBits(auCPBRemovalDelayLengthMinus1 + dpbOutputDelayLengthMinus1 + 2, true);
                 if (subPicHRDParamsPresentFlag)
                 {
-                    byte dpbOutputDelayDULengthMinus1 = (byte) seqParameterSetItem.VUIParameters.XXLCommon.DPBOutputDelayDULengthMinus1;
+                    byte dpbOutputDelayDULengthMinus1 = (byte) xxlCommon.DPBOutputDelayDULengthMinus1;
                     buffer.BSSkipBits(dpbOutputDelayDULengthMinus1 + 1, true);
                 }
             }

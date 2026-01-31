@@ -27,11 +27,11 @@ namespace BDInfo
 {
     public class TSInterleavedFile
     {
-        public DiscFileInfo DFileInfo = null;
-        public UdfReader CdReader = null;
+        public DiscFileInfo? DFileInfo = null;
+        public UdfReader? CdReader = null;
 
-        public FileInfo FileInfo = null;
-        public string Name = null;
+        public FileInfo? FileInfo = null;
+        public string? Name = null;
 
         public TSInterleavedFile(FileInfo fileInfo)
         {

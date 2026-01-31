@@ -33,7 +33,7 @@ namespace BDInfo
     {
         public ulong TransferCount = 0;
 
-        public string StreamTag = null;
+        public string StreamTag = string.Empty;
 
         public ulong TotalPackets = 0;
         public ulong WindowPackets = 0;
@@ -142,8 +142,8 @@ namespace BDInfo
 
         public byte PMTTemp = 0;
 
-        public TSStream Stream = null;
-        public TSStreamState StreamState = null;
+        public TSStream? Stream = null;
+        public TSStreamState? StreamState = null;
 
         public ulong TotalPackets = 0;
     }
@@ -154,20 +154,20 @@ namespace BDInfo
         public ulong Packets = 0;
         public double Marker = 0;
         public double Interval = 0;
-        public string Tag = null;
+        public string? Tag = null;
     }
 
     public class TSStreamFile
     {
-        public DiscFileInfo DFileInfo = null;
-        public UdfReader CdReader = null;
+        public DiscFileInfo? DFileInfo = null;
+        public UdfReader? CdReader = null;
 
-        public FileInfo FileInfo = null;
-        public string Name = null;
+        public FileInfo? FileInfo = null;
+        public string? Name = null;
         public long Size = 0;
         public double Length = 0;
 
-        public TSInterleavedFile InterleavedFile = null;
+        public TSInterleavedFile? InterleavedFile = null;
 
         private Dictionary<ushort, TSStreamState> StreamStates =
             new Dictionary<ushort, TSStreamState>();
@@ -178,10 +178,10 @@ namespace BDInfo
         public Dictionary<ushort, List<TSStreamDiagnostics>> StreamDiagnostics =
             new Dictionary<ushort, List<TSStreamDiagnostics>>();
 
-        private List<TSPlaylistFile> Playlists = null;
+        private List<TSPlaylistFile>? Playlists = null;
 #if DEBUG && !BETA
-        private FileStream logFile = null;
-        private TextWriter logTextWriter = null;
+    private FileStream? logFile = null;
+    private TextWriter? logTextWriter = null;
 #endif
 
         public TSStreamFile(FileInfo fileInfo)
@@ -208,21 +208,15 @@ namespace BDInfo
                 if (BDInfoSettings.EnableSSIF &&
                     InterleavedFile != null)
                 {
-                    return InterleavedFile.Name;
+                    return InterleavedFile.Name ?? (Name ?? string.Empty);
                 }
-                return Name;
+                return Name ?? string.Empty;
             }
         }
 
         public string GetFilePath()
         {
-            if (!string.IsNullOrEmpty(FileInfo?.FullName))
-                return FileInfo.FullName;
-
-            if (!string.IsNullOrEmpty(DFileInfo?.FullName))
-                return DFileInfo.FullName;
-
-            return string.Empty;
+            return FileInfo?.FullName ?? DFileInfo?.FullName ?? string.Empty;
         }
 
         private bool ScanStream(
@@ -231,7 +225,7 @@ namespace BDInfo
             TSStreamBuffer buffer,
             bool isFullScan)
         {
-            streamState.StreamTag = null;
+            streamState.StreamTag = string.Empty;
 
             long bitrate = 0;
             if (stream.IsAudioStream &&
@@ -447,43 +441,44 @@ namespace BDInfo
                         {
                             playlistStreams = playlist.AngleStreams[clip.AngleIndex - 1];
                         }
-                        if (playlistStreams.ContainsKey(PID))
-                        {
-                            TSStream stream = playlistStreams[PID];
-
-                            stream.PayloadBytes += streamState.WindowBytes;
-                            stream.PacketCount += streamState.WindowPackets;
-
-                            if (stream.IsVideoStream)
-                            {
-                                stream.PacketSeconds += streamInterval;
-
-                                stream.ActiveBitRate = (long)Math.Round(
-                                    ((stream.PayloadBytes * 8.0) /
-                                    stream.PacketSeconds));
 #if DEBUG && !BETA
-                                logTextWriter.WriteLine($"{PID,6}\t{stream.ActiveBitRate,16:000000.000}\t{streamState.WindowBytes,16}\t{stream.PayloadBytes,16}\t{streamState.WindowPackets,16}\t{stream.PacketCount,16}\t{stream.PacketSeconds,16:000000.000}\t{streamInterval,16:000000.000}");
+#endif
+                        if (playlistStreams.TryGetValue(PID, out TSStream? playlistStream))
+                        {
+                            playlistStream.PayloadBytes += streamState.WindowBytes;
+                            playlistStream.PacketCount += streamState.WindowPackets;
+
+                            if (playlistStream.IsVideoStream)
+                            {
+                                playlistStream.PacketSeconds += streamInterval;
+
+                                playlistStream.ActiveBitRate = (long)Math.Round(
+                                    ((playlistStream.PayloadBytes * 8.0) /
+                                    playlistStream.PacketSeconds));
+#if DEBUG && !BETA
+                                logTextWriter?.WriteLine($"{PID,6}\t{playlistStream.ActiveBitRate,16:000000.000}\t{streamState.WindowBytes,16}\t{playlistStream.PayloadBytes,16}\t{streamState.WindowPackets,16}\t{playlistStream.PacketCount,16}\t{playlistStream.PacketSeconds,16:000000.000}\t{streamInterval,16:000000.000}");
 #endif
                             }
 
-                            if (stream.StreamType == TSStreamType.AC3_TRUE_HD_AUDIO &&
-                                ((TSAudioStream)stream).CoreStream != null)
+                            if (playlistStream.StreamType == TSStreamType.AC3_TRUE_HD_AUDIO)
                             {
-                                stream.ActiveBitRate -=
-                                    ((TSAudioStream)stream).CoreStream.BitRate;
+                                var audio = playlistStream as TSAudioStream;
+                                if (audio?.CoreStream != null)
+                                {
+                                    playlistStream.ActiveBitRate -= audio.CoreStream.BitRate;
+                                }
                             }
                         }
                     }
                 }
             }
 
-            if (Streams.ContainsKey(PID))
+            if (Streams.TryGetValue(PID, out TSStream? foundStream))
             {
-                TSStream stream = Streams[PID];
-                stream.PayloadBytes += streamState.WindowBytes;
-                stream.PacketCount += streamState.WindowPackets;
+                foundStream.PayloadBytes += streamState.WindowBytes;
+                foundStream.PacketCount += streamState.WindowPackets;
 
-                if (stream.IsVideoStream)
+                if (foundStream.IsVideoStream)
                 {
                     TSStreamDiagnostics diag = new TSStreamDiagnostics();
                     diag.Marker = (double)PTS / 90000;
@@ -491,9 +486,14 @@ namespace BDInfo
                     diag.Bytes = streamState.WindowBytes;
                     diag.Packets = streamState.WindowPackets;
                     diag.Tag = streamState.StreamTag;
-                    StreamDiagnostics[PID].Add(diag);
+                    if (!StreamDiagnostics.TryGetValue(PID, out var diagList))
+                    {
+                        diagList = new List<TSStreamDiagnostics>();
+                        StreamDiagnostics[PID] = diagList;
+                    }
+                    diagList.Add(diag);
 
-                    stream.PacketSeconds += streamInterval;
+                    foundStream.PacketSeconds += streamInterval;
                 }
             }
             streamState.WindowPackets = 0;
@@ -515,8 +515,8 @@ namespace BDInfo
 
             Playlists = playlists;
             int dataSize = 5242880;
-            Stream fileStream = null;
-            byte[] buffer = null;
+            Stream? fileStream = null;
+            byte[]? buffer = null;
             int bufferLength = 0;
             try
             {
@@ -536,9 +536,9 @@ namespace BDInfo
                     }
                     else
                     {
-                        fileName = InterleavedFile.DFileInfo.FullName;
+                        fileName = InterleavedFile.DFileInfo!.FullName;
 #if DEBUG && !BETA
-                        logFileName = InterleavedFile.DFileInfo.Name;
+                        logFileName = InterleavedFile.DFileInfo!.Name;
 #endif
                     }
                 }
@@ -553,9 +553,9 @@ namespace BDInfo
                     }
                     else
                     {
-                        fileName = DFileInfo.FullName;
+                        fileName = DFileInfo!.FullName;
 #if DEBUG && !BETA
-                        logFileName = DFileInfo.Name;
+                        logFileName = DFileInfo!.Name;
 #endif
                     }
                 }
@@ -589,13 +589,13 @@ namespace BDInfo
                 TSPacketParser parser =
                     new TSPacketParser();
 
-                long fileLength = (uint)fileStream.Length;
+                long fileLength = fileStream!.Length;
                 buffer = ArrayPool<byte>.Shared.Rent(dataSize);
 
 #if DEBUG && !BETA
                 var appPath = this.GetType().Assembly.Location;
                 var appDirectory = Path.GetDirectoryName(appPath);
-                var logDir = Path.Combine(appDirectory, "StreamLogs");
+                var logDir = Path.Combine(appDirectory ?? string.Empty, "StreamLogs");
                 try
                 {
                     if (!Directory.Exists(logDir))
@@ -608,11 +608,11 @@ namespace BDInfo
                     Console.WriteLine(ex.ToString());
                 }
 
-                logFile = new FileStream(Path.ChangeExtension(Path.Combine(logDir, logFileName), "txt"), FileMode.Create, FileAccess.Write);
+                logFile = new FileStream(Path.ChangeExtension(Path.Combine(logDir, logFileName ?? string.Empty), "txt"), FileMode.Create, FileAccess.Write);
                 logTextWriter = new StreamWriter(logFile);
                 logTextWriter.WriteLine(String.Format("{0,6}\t{1,16}\t{2,16}\t{3,16}\t{4,16}\t{5,16}\t{6,16}\t{7,16}", "PID", "Active Bitrate", "Window Bytes", "Payload Bytes", "Window Packets", "Packet Count", "Packet Seconds", "Stream Interval"));
 #endif
-                while ((bufferLength = await fileStream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
+                while ((bufferLength = await fileStream.ReadAsync(buffer!, 0, buffer.Length).ConfigureAwait(false)) > 0)
                 {
                     int offset = 0;
                     for (int i = 0; i < bufferLength; i++)
@@ -714,23 +714,26 @@ namespace BDInfo
                                         {
                                             parser.PMTSectionStart = true;
                                         }
-                                        else if (parser.StreamState != null &&
-                                            parser.StreamState.TransferState)
-                                        {
-                                            parser.StreamState.TransferState = false;
-                                            parser.StreamState.TransferCount++;
-
-                                            bool isFinished = ScanStream(
-                                                parser.Stream,
-                                                parser.StreamState,
-                                                parser.StreamState.StreamBuffer,
-                                                isFullScan);
-
-                                            if (!isFullScan && isFinished)
+                                            if (parser.StreamState != null &&
+                                                parser.StreamState.TransferState)
                                             {
-                                                return;
+                                                parser.StreamState.TransferState = false;
+                                                parser.StreamState.TransferCount++;
+
+                                                if (parser.Stream != null)
+                                                {
+                                                    bool isFinished = ScanStream(
+                                                        parser.Stream,
+                                                        parser.StreamState,
+                                                        parser.StreamState.StreamBuffer,
+                                                        isFullScan);
+
+                                                    if (!isFullScan && isFinished)
+                                                    {
+                                                        return;
+                                                    }
+                                                }
                                             }
-                                        }
                                     }
                                 }
                                 break;
@@ -1648,12 +1651,12 @@ namespace BDInfo
             }
         }
 
-        private TSStream CreateStream(
+        private TSStream? CreateStream(
             ushort streamPID,
             byte streamType,
             List<TSDescriptor> streamDescriptors)
         {
-            TSStream stream = null;
+            TSStream? stream = null;
 
             switch ((TSStreamType)streamType)
             {

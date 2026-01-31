@@ -5,29 +5,33 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.Serialization;
 using BDInfo;
-using Mono.Options;
 using System.Threading;
 
 namespace BDInfo.Cli
 {
     internal static class Program
     {
-        static void show_help(OptionSet option_set, string msg = null)
+        static void show_help(string? msg = null)
         {
             if (msg != null)
                 Console.Error.WriteLine(msg);
-            Console.Error.WriteLine("Usage: bdinfo-cli <BD_PATH> [REPORT_DEST]");
+            Console.Error.WriteLine("Usage: bdinfo-cli [OPTIONS] <BD_PATH> [REPORT_DEST]");
             Console.Error.WriteLine("BD_PATH may be a directory containing a BDMV folder or a BluRay ISO file.");
             Console.Error.WriteLine("REPORT_DEST is the folder the BDInfo report is to be written to. If not");
             Console.Error.WriteLine("given, the report will be written to BD_PATH. REPORT_DEST is required if");
             Console.Error.WriteLine("BD_PATH is an ISO file.\n");
-            option_set.WriteOptionDescriptions(Console.Error);
+            Console.Error.WriteLine("Options:");
+            Console.Error.WriteLine("  -h, --help        Print out the options.");
+            Console.Error.WriteLine("  -l, --list        Print the list of playlists.");
+            Console.Error.WriteLine("  -m, --mpls <v>    Comma separated list of playlists to scan.");
+            Console.Error.WriteLine("  -w, --whole       Scan whole disc - every playlist.");
+            Console.Error.WriteLine("  -v, --version     Print the version.");
             Environment.Exit(-1);
         }
 
         private static int getIntIndex(int min, int max)
         {
-            string response;
+            string? response = null;
             int resp = -1;
             do
             {
@@ -39,13 +43,10 @@ namespace BDInfo.Cli
                 if (response == "q")
                     return -1;
 
-                try
-                {
-                    resp = int.Parse(response);
-                }
-                catch (Exception)
+                if (!int.TryParse(response, out resp))
                 {
                     Console.WriteLine("Invalid Input!");
+                    resp = -1;
                 }
 
                 if (resp > max || resp < min)
@@ -61,25 +62,26 @@ namespace BDInfo.Cli
 
         private class ScanState
         {
-            public TSStreamFile StreamFile;
-            public List<TSPlaylistFile> Playlists;
+            public TSStreamFile? StreamFile;
+            public List<TSPlaylistFile>? Playlists;
             public long FinishedBytes;
-            public Exception Exception;
+            public Exception? Exception;
             public DateTime StartTime;
         }
 
-        private static void ScanBDROMProgress(object state)
+        private static void ScanBDROMProgress(object? state)
         {
             try
             {
-                var s = (ScanState)state;
-                if (s?.StreamFile == null) return;
-                long scanned = s.StreamFile.Size;
+                var s = state as ScanState;
+                if (s == null || s.StreamFile == null) return;
+                var sf = s.StreamFile;
+                long scanned = sf.Size;
                 long total = 0;
-                if (BDInfoSettings.EnableSSIF && s.StreamFile.InterleavedFile != null)
-                    total = s.StreamFile.InterleavedFile.FileInfo?.Length ?? s.StreamFile.InterleavedFile.DFileInfo.Length;
+                if (BDInfoSettings.EnableSSIF && sf.InterleavedFile != null)
+                    total = sf.InterleavedFile?.FileInfo?.Length ?? sf.InterleavedFile?.DFileInfo?.Length ?? 0;
                 else
-                    total = s.StreamFile.FileInfo?.Length ?? s.StreamFile.DFileInfo.Length;
+                    total = sf.FileInfo?.Length ?? sf.DFileInfo?.Length ?? 0;
 
                 var elapsed = DateTime.Now - s.StartTime;
                 string etaStr = "--:--:--";
@@ -94,7 +96,7 @@ namespace BDInfo.Cli
                     }
                 }
 
-                string status = String.Format("{0,16}{1,-25}{2,-13}{3}", "", s.StreamFile.Name, elapsed.ToString("hh\\:mm\\:ss"), etaStr);
+                string status = String.Format("{0,16}{1,-25}{2,-13}{3}", "", sf.Name, elapsed.ToString("hh\\:mm\\:ss"), etaStr);
                 // Overwrite the same console line
                 try
                 {
@@ -110,9 +112,11 @@ namespace BDInfo.Cli
             catch { }
         }
 
-        private static void ScanBDROMThread(object state)
+        private static void ScanBDROMThread(object? state)
         {
-            var s = (ScanState)state;
+            var s = state as ScanState;
+            if (s == null || s.StreamFile == null || s.Playlists == null)
+                return;
             try
             {
                 s.StreamFile.Scan(s.Playlists, true);
@@ -130,32 +134,32 @@ namespace BDInfo.Cli
             bool version = false;
             bool whole = false;
             bool list = false;
-            string mpls = null;
+            string? mpls = null;
 
-            OptionSet option_set = new OptionSet()
-                .Add("h|help", "Print out the options.", option => help = option != null)
-                .Add("l|list", "Print the list of playlists.", option => list = option != null)
-                .Add("m=|mpls=", "Comma separated list of playlists to scan.", option => mpls = option)
-                .Add("w|whole", "Scan whole disc - every playlist.", option => whole = option != null)
-                .Add("v|version", "Print the version.", option => version = option != null)
-            ;
-
+            // Lightweight, cross-platform option parsing (replaces Mono.Options)
             List<string> nsargs = new List<string>();
-            try
+            for (int i = 0; i < args.Length; i++)
             {
-                nsargs = option_set.Parse(args);
-            }
-            catch (OptionException)
-            {
-                show_help(option_set, "Error - usage is:");
+                string a = args[i] ?? string.Empty;
+                if (a == "--") { nsargs.AddRange(args.Skip(i + 1)); break; }
+                if (!a.StartsWith("-") || a == "") { nsargs.AddRange(args.Skip(i)); break; }
+
+                if (a == "-h" || a == "--help") { help = true; continue; }
+                if (a == "-l" || a == "--list") { list = true; continue; }
+                if (a == "-w" || a == "--whole") { whole = true; continue; }
+                if (a == "-v" || a == "--version") { version = true; continue; }
+                if (a.StartsWith("-m=") || a.StartsWith("--mpls=")) { mpls = a.Substring(a.IndexOf('=') + 1); continue; }
+                if (a == "-m" || a == "--mpls") { if (i + 1 < args.Length) { mpls = args[++i]; continue; } else show_help("Error - missing value for --mpls"); }
+
+                show_help($"Unknown option: {a}");
             }
 
-            if (help)
-                show_help(option_set);
+            if (help) show_help();
 
             if (version)
             {
-                Console.WriteLine(Assembly.GetExecutingAssembly().GetName().Version.ToString());
+                var ver = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
+                Console.WriteLine(ver);
                 return 0;
             }
 
@@ -164,7 +168,7 @@ namespace BDInfo.Cli
 
             if (nsargs.Count == 0)
             {
-                show_help(option_set, "Error: insufficient args - usage is:");
+                show_help("Error: insufficient args - usage is:");
             }
 
             string bdPath = nsargs[0];
@@ -209,7 +213,6 @@ namespace BDInfo.Cli
             List<TSPlaylistFile> selectedPlaylists = new List<TSPlaylistFile>();
 
             // Build groups and print playlists similar to original LoadPlaylists
-            bool hasHiddenTracks = false;
             List<List<TSPlaylistFile>> groups = new List<List<TSPlaylistFile>>();
 
             TSPlaylistFile[] sortedPlaylistFiles = new TSPlaylistFile[bdrom.PlaylistFiles.Count];
@@ -318,9 +321,10 @@ namespace BDInfo.Cli
             {
                 foreach (TSStreamClip clip in playlist.StreamClips)
                 {
-                    if (!streamFiles.Contains(clip.StreamFile))
+                    var csf = clip.StreamFile;
+                    if (csf != null && !streamFiles.Contains(csf))
                     {
-                        streamFiles.Add(clip.StreamFile);
+                        streamFiles.Add(csf);
                     }
                 }
             }
@@ -332,11 +336,11 @@ namespace BDInfo.Cli
                 {
                     if (BDInfoSettings.EnableSSIF && sf.InterleavedFile != null)
                     {
-                        totalBytes += sf.InterleavedFile.FileInfo?.Length ?? sf.InterleavedFile.DFileInfo.Length;
+                        totalBytes += sf.InterleavedFile?.FileInfo?.Length ?? sf.InterleavedFile?.DFileInfo?.Length ?? 0;
                     }
                     else
                     {
-                        totalBytes += sf.FileInfo?.Length ?? sf.DFileInfo.Length;
+                        totalBytes += sf.FileInfo?.Length ?? sf.DFileInfo?.Length ?? 0;
                     }
                 }
 
@@ -383,19 +387,29 @@ namespace BDInfo.Cli
                             try { ScanBDROMProgress(scanState); Console.WriteLine(); } catch { }
 
                             // update finished bytes estimate
-                            if (streamFile.FileInfo != null)
-                                scanState.FinishedBytes += streamFile.FileInfo.Length;
-                            else
-                                scanState.FinishedBytes += streamFile.DFileInfo.Length;
-
-                            if (scanState.Exception != null)
+                            scanState.FinishedBytes += streamFile.FileInfo?.Length ?? streamFile.DFileInfo?.Length ?? 0;
+                            var sfName = streamFile.Name;
+                            if (sfName != null)
                             {
-                                scanResult.FileExceptions[streamFile.Name] = scanState.Exception;
+                                if (scanState.Exception != null)
+                                    scanResult.FileExceptions[sfName] = scanState.Exception;
+                            }
+                            else
+                            {
+                                var key = streamFile.FileInfo?.FullName ?? streamFile.DFileInfo?.FullName ?? Guid.NewGuid().ToString();
+                                scanResult.FileExceptions[key] = scanState.Exception ?? new Exception("Scan failed");
                             }
                         }
                         catch (Exception ex)
                         {
-                            scanResult.FileExceptions[streamFile.Name] = ex;
+                            var sfNameCatch = streamFile.Name;
+                            if (sfNameCatch != null)
+                                scanResult.FileExceptions[sfNameCatch] = ex;
+                            else
+                            {
+                                var key = streamFile.FileInfo?.FullName ?? streamFile.DFileInfo?.FullName ?? Guid.NewGuid().ToString();
+                                scanResult.FileExceptions[key] = ex;
+                            }
                         }
                     }
                     discSw.Stop();
@@ -416,9 +430,10 @@ namespace BDInfo.Cli
                         List<TSStreamFile> filesForPlaylist = new List<TSStreamFile>();
                         foreach (TSStreamClip clip in playlist.StreamClips)
                         {
-                            if (!scanned.Contains(clip.StreamFile.Name))
+                            var csf = clip.StreamFile;
+                            if (csf != null && csf.Name != null && !scanned.Contains(csf.Name))
                             {
-                                filesForPlaylist.Add(clip.StreamFile);
+                                filesForPlaylist.Add(csf);
                             }
                         }
 
@@ -455,21 +470,31 @@ namespace BDInfo.Cli
                                 
                                 // print a final status line for this file and move to next line
                                 try { ScanBDROMProgress(scanState); Console.WriteLine(); } catch { }
-                                if (streamFile.FileInfo != null)
-                                    scanState.FinishedBytes += streamFile.FileInfo.Length;
-                                else
-                                    scanState.FinishedBytes += streamFile.DFileInfo.Length;
-
-                                if (scanState.Exception != null)
+                                scanState.FinishedBytes += streamFile.FileInfo?.Length ?? streamFile.DFileInfo?.Length ?? 0;
+                                var sfName2 = streamFile.Name;
+                                if (sfName2 != null)
                                 {
-                                    scanResult.FileExceptions[streamFile.Name] = scanState.Exception;
+                                    if (scanState.Exception != null)
+                                        scanResult.FileExceptions[sfName2] = scanState.Exception;
+                                    scanned.Add(sfName2);
                                 }
-
-                                scanned.Add(streamFile.Name);
+                                else
+                                {
+                                    var key = streamFile.FileInfo?.FullName ?? streamFile.DFileInfo?.FullName ?? Guid.NewGuid().ToString();
+                                    scanResult.FileExceptions[key] = scanState.Exception ?? new Exception("Scan failed");
+                                    scanned.Add(key);
+                                }
                             }
                             catch (Exception ex)
                             {
-                                scanResult.FileExceptions[streamFile.Name] = ex;
+                                var sfNameCatch2 = streamFile.Name;
+                                if (sfNameCatch2 != null)
+                                    scanResult.FileExceptions[sfNameCatch2] = ex;
+                                else
+                                {
+                                    var key = streamFile.FileInfo?.FullName ?? streamFile.DFileInfo?.FullName ?? Guid.NewGuid().ToString();
+                                    scanResult.FileExceptions[key] = ex;
+                                }
                             }
                         }
                         sw.Stop();

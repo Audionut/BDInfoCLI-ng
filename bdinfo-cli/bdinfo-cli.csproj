@@ -11,9 +11,7 @@
   <ItemGroup>
     <!-- Include core, non-UI sources from the BDInfo tree -->
     <Compile Include="..\BDInfo\BDROM\**\*.cs" />
-    <Compile Include="..\BDInfo\BDInfo.Core\**\*.cs" />
     <Compile Include="..\BDInfo\ToolBox.cs" />
-    <Compile Include="..\BDInfo\Options.cs" />
   </ItemGroup>
 
   <ItemGroup>

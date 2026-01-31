@@ -135,12 +135,12 @@ namespace BDInfo
 
         public ushort PID;
         public TSStreamType StreamType;
-        public List<TSDescriptor> Descriptors = null;
+        public List<TSDescriptor>? Descriptors = null;
         public long BitRate = 0;
         public long ActiveBitRate = 0;
         public bool IsVBR = false;
         public bool IsInitialized = false;
-        public string LanguageName;
+        public string? LanguageName = null;
         public bool IsHidden = false;
 
         public ulong PayloadBytes = 0;
@@ -152,7 +152,7 @@ namespace BDInfo
 
         public ulong PacketSize => PacketCount * 192;
 
-        private string _LanguageCode;
+        private string _LanguageCode = string.Empty;
         public string LanguageCode
         {
             get
@@ -266,7 +266,10 @@ namespace BDInfo
                     case TSStreamType.MPEG2_AUDIO:
                     case TSStreamType.MPEG2_AAC_AUDIO:
                     case TSStreamType.MPEG4_AAC_AUDIO:
-                        return (string)((TSAudioStream)this).ExtendedData;
+                        {
+                            var ed = ((TSAudioStream)this).ExtendedData as string;
+                            return ed ?? string.Empty;
+                        }
                     case TSStreamType.LPCM_AUDIO:
                         return "LPCM Audio";
                     case TSStreamType.AC3_AUDIO:
@@ -485,9 +488,9 @@ namespace BDInfo
         public int FrameRateEnumerator;
         public int FrameRateDenominator;
         public TSAspectRatio AspectRatio;
-        public string EncodingProfile;
+        public string? EncodingProfile = null;
 
-        public object ExtendedData;
+        public object? ExtendedData = null;
 
         private TSVideoFormat _VideoFormat;
         public TSVideoFormat VideoFormat
@@ -686,10 +689,10 @@ namespace BDInfo
 
         public bool HasExtensions = false;
 
-        public object ExtendedData;
+        public object? ExtendedData = null;
 
         public TSAudioMode AudioMode;
-        public TSAudioStream CoreStream;
+        public TSAudioStream? CoreStream = null;
         public TSChannelLayout ChannelLayout;
 
         public static int ConvertSampleRate(

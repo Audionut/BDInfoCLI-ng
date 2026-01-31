@@ -86,7 +86,7 @@ namespace BDInfo
                         }
                         else
                         {
-                            tag = null;
+                            tag = string.Empty;
                         }
                         if (stream.IsInitialized) return;
                     }

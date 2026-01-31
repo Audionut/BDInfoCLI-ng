@@ -33,8 +33,8 @@ namespace BDInfo
             uint parse = 0;
             byte accessUnitDelimiterParse = 0;
             byte sequenceParameterSetParse = 0;
-            string profile = null;
-            string level = null;
+            string? profile = null;
+            string? level = null;
             byte constraintSet0Flag = 0;
             byte constraintSet1Flag = 0;
             byte constraintSet2Flag = 0;
@@ -139,7 +139,7 @@ namespace BDInfo
                                         b / 10, (b - ((b / 10) * 10)));
                                 }
                                 stream.EncodingProfile = string.Format(
-                                    "{0} {1}", profile, level);
+                                    "{0} {1}", profile ?? "Unknown Profile", level ?? "0.0");
                                 stream.IsVBR = true;
                                 stream.IsInitialized = true;
                                 break;

@@ -124,7 +124,7 @@ namespace BDInfo
         {
             if (_stream.Position + bytes >= _bufferLength)
             {
-                return null;
+                return Array.Empty<byte>();
             }
 
             var value = ArrayPool<byte>.Shared.Rent(bytes);

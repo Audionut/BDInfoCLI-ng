@@ -29,13 +29,13 @@ namespace BDInfo
 {
     public class TSStreamClipFile
     {
-        public DiscFileInfo DFileInfo = null;
-        public UdfReader CdReader = null;
+        public DiscFileInfo? DFileInfo = null;
+        public UdfReader? CdReader = null;
 
-        public FileInfo FileInfo = null;
-        public string FileType = null;
+        public FileInfo? FileInfo = null;
+        public string? FileType = null;
         public bool IsValid = false;
-        public string Name = null;
+        public string? Name = null;
 
         public Dictionary<ushort, TSStream> Streams =
             new Dictionary<ushort,TSStream>();
@@ -59,9 +59,9 @@ namespace BDInfo
 
         public void Scan()
         {
-            FileStream fileStream = null;
-            Stream discFileStream = null;
-            BinaryReader fileReader = null;
+            FileStream? fileStream = null;
+            Stream? discFileStream = null;
+            BinaryReader? fileReader = null;
             ulong streamLength = 0;
 
             try
@@ -84,16 +84,29 @@ namespace BDInfo
                     fileReader = new BinaryReader(fileStream);
                     streamLength = (ulong)fileStream.Length;
                 }
-                else
+                else if (DFileInfo != null)
                 {
+                    if (CdReader == null)
+                    {
+                        throw new Exception(string.Format(
+                            "Clip info file {0} has no CD reader available for disc file {1}.",
+                            Name ?? string.Empty, DFileInfo.FullName));
+                    }
                     CdReader.OpenFile(DFileInfo.FullName, FileMode.Open);
                     discFileStream = CdReader.GetFileInfo(DFileInfo.FullName).OpenRead();
                     fileReader = new BinaryReader(discFileStream);
                     streamLength = (ulong)discFileStream.Length;
                 }
+                else
+                {
+                    throw new Exception(string.Format(
+                        "Clip info file {0} has no file info available.",
+                        Name ?? string.Empty));
+                }
 
-                byte[] data = new byte[streamLength];
-                fileReader.Read(data, 0, data.Length);
+                if (streamLength > int.MaxValue) throw new Exception("Clip info file too large.");
+                byte[] data = new byte[(int)streamLength];
+                fileReader!.Read(data, 0, data.Length);
 
                 byte[] fileType = new byte[8];
                 Array.Copy(data, 0, fileType, 0, fileType.Length);
@@ -105,7 +118,7 @@ namespace BDInfo
                 {
                     throw new Exception(string.Format(
                         "Clip info file {0} has an unknown file type {1}.",
-                        FileInfo.Name, FileType));
+                        Name ?? string.Empty, FileType));
                 }
 #if DEBUG
                 Debug.WriteLine(string.Format(
@@ -136,7 +149,7 @@ namespace BDInfo
                     streamIndex < streamCount;
                     streamIndex++)
                 {
-                    TSStream stream = null;
+                    TSStream? stream = null;
 
                     ushort PID = (ushort)
                         ((clipData[streamOffset] << 8) +
