@@ -112,6 +112,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Prepare lowercase tags
+        run: |
+          echo "OWNER_LOWER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "REF_LOWER=$(echo '${{ github.ref_name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Build and push multi-arch image
         uses: docker/build-push-action@v4
         with:
@@ -120,8 +125,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ toLower(github.repository_owner) }}/bdinfo:latest
-            ghcr.io/${{ toLower(github.repository_owner) }}/bdinfo:${{ toLower(github.ref_name) }}
+            ghcr.io/${{ env.OWNER_LOWER }}/bdinfo:latest
+            ghcr.io/${{ env.OWNER_LOWER }}/bdinfo:${{ env.REF_LOWER }}
 
   release:
     needs: build
