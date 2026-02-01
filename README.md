@@ -45,51 +45,7 @@ BDInfo.exe -m 00006.MPLS,00009.MPLS BD_PATH
 BDInfo.exe -v
 ```
 
-## Windows
-
-### Requirements
-
-<ul>
-<li>Windows Vista, Windows 7 or higher Operating System</li>
-<li>.NET Framework 4.5 or Higher</li>
-<li>Source Code</li>
-</ul>
-
-BDInfoCLI-ng can be built using the free tool <a href="https://www.visualstudio.com/vs/community/">Microsoft Visual Studio Community Edition</a>. Just install Visual Studio, open ```BDInfo.sln```, and build.
-
-## Linux
-
-BDInfoCLI-ng can be built and run with <a href="https://www.mono-project.com/">Mono</a>.
-
-Using Docker is highly recommend (nobody should have to taint their OS with Mono).
-
-To do so install Docker and then simply use the included ``bdinfo`` wrapper script inside the ``scripts`` directory. The wrapper script automatically handles mounting the necessary directories into the container. The first run will be slow as the container image will have to be downloaded, subsequent runs will not be.
-
-Wrapper script example:
-```
-./bdinfo --help
-
-# Display playlists in given disc, prompt user to select playlists
-# to scan, and output the generated report to the same disc path:
-# (If an ISO file is given, then a REPORT_DEST must be given as well. See next example.)
-./bdinfo BD_PATH
-
-# Same as above, but output report in given report folder:
-# (If BD_PATH is an ISO, these are the minimum arguments required)
-./bdinfo BD_PATH REPORT_OUTPUT_DIR
-```
-
-Alternatively, you can run the Docker container yourself, e.g:
-```
-docker run --rm -it -v <BD_PATH>:/mnt/bd fr3akyphantom/bdinfocli-ng /mnt/bd
-```
-or, with a ``REPORT_DEST``:
-```
-docker run --rm -it -v <BD_PATH>:/mnt/bd -v <REPORT_DEST>:/mnt/report fr3akyphantom/bdinfocli-ng /mnt/bd /mnt/report
-```
-
-Without Docker you will need to build it and run it yourself with Mono (see the Dockerfile for details on how that's done).
-
-## Mac
-
-The above instructions for using BDInfoCLI-ng with Docker on Linux should also work for Macs, but it has not been tested.
+## Notes
+This version is predominantly built for https://github.com/Audionut/Upload-Assistant which uses it's own playlist detection, and only runs on playlists.
+It may or may not work in other uses, as other use cases are never tested. Must have an argument supplied.
+Requires a x64 architecture, with windows/linux (and docker)/mac binaries being published.
