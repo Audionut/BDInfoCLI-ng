@@ -34,14 +34,6 @@
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
-  <!-- Runtime configuration properties that will be written into the generated runtimeconfig.json
-       These allow setting GC options at publish time so they are respected by published binaries. -->
-  <ItemGroup>
-    <RuntimeHostConfigurationOption Include="System.GC.Server" Value="false" />
-    <RuntimeHostConfigurationOption Include="System.GC.Concurrent" Value="true" />
-    <RuntimeHostConfigurationOption Include="System.GC.HeapHardLimit" Value="2147483648" />
-  </ItemGroup>
-
     <!-- Remove unwanted native libraries from the publish output (e.g. lzfse) -->
     <Target Name="RemoveUnwantedNativeLibs" AfterTargets="Publish">
       <Delete Files="$(PublishDir)lzfse.dll" ContinueOnError="true" />
