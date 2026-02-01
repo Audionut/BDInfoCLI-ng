@@ -518,6 +518,7 @@ namespace BDInfo
             Stream? fileStream = null;
             byte[]? buffer = null;
             int bufferLength = 0;
+            bool stopScan = false;
             try
             {
                 string fileName;
@@ -730,7 +731,7 @@ namespace BDInfo
 
                                                     if (!isFullScan && isFinished)
                                                     {
-                                                        return;
+                                                        stopScan = true;
                                                     }
                                                 }
                                             }
@@ -989,8 +990,6 @@ namespace BDInfo
                                                     }
                                                     */
                                                     CreateStream(streamPID, streamType, streamDescriptors);
-                                                    if (Streams[streamPID].IsGraphicsStream)
-                                                        Streams[streamPID].IsInitialized = !isFullScan;
                                                 }
                                                 k += streamInfoLength;
                                             }
@@ -1219,7 +1218,7 @@ namespace BDInfo
 
                                     if (!isFullScan && isFinished)
                                     {
-                                        return;
+                                        stopScan = true;
                                     }
                                 }
                             }
@@ -1612,6 +1611,15 @@ namespace BDInfo
                                 parser.SyncState = false;
                             }
                         }
+
+                        if (stopScan)
+                        {
+                            break;
+                        }
+                    }
+                    if (stopScan)
+                    {
+                        break;
                     }
                     Size += bufferLength;
                 }

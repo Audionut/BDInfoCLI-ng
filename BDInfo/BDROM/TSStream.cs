@@ -931,7 +931,7 @@ namespace BDInfo
         public TSTextStream()
         {
             IsVBR = true;
-            IsInitialized = true;
+            IsInitialized = false;
         }
 
         public override TSStream Clone()
