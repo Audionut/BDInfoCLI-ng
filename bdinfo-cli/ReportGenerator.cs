@@ -31,6 +31,61 @@ namespace BDInfo
     /// </summary>
     public class ReportGenerator
     {
+        private const double FullScanSecondsThreshold = 0.98;
+
+        private static ulong GetClipFileSize(TSStreamClip clip)
+        {
+            if (BDInfoSettings.EnableSSIF && clip.StreamFile?.InterleavedFile != null)
+            {
+                return clip.InterleavedFileSize;
+            }
+            return clip.FileSize;
+        }
+
+        private static ulong GetEffectiveClipSize(TSStreamClip clip)
+        {
+            if (clip.Length <= 0)
+            {
+                if (clip.PacketSize > 0)
+                {
+                    return clip.PacketSize;
+                }
+                return GetClipFileSize(clip);
+            }
+
+            if (clip.PacketSeconds > 0 && clip.PacketSize > 0)
+            {
+                if (clip.PacketSeconds >= clip.Length * FullScanSecondsThreshold)
+                {
+                    return clip.PacketSize;
+                }
+
+                double bytesPerSecond = clip.PacketSize / clip.PacketSeconds;
+                return (ulong)Math.Round(bytesPerSecond * clip.Length);
+            }
+
+            ulong fallbackSize = GetClipFileSize(clip);
+            if (fallbackSize > 0)
+            {
+                return fallbackSize;
+            }
+
+            return clip.PacketSize;
+        }
+
+        private static ulong GetEffectiveTotalSize(TSPlaylistFile playlist)
+        {
+            ulong size = 0;
+            foreach (TSStreamClip clip in playlist.StreamClips)
+            {
+                if (clip.AngleIndex == 0)
+                {
+                    size += GetEffectiveClipSize(clip);
+                }
+            }
+            return size;
+        }
+
         /// <summary>
         /// Gets the product version string.
         /// </summary>
@@ -160,12 +215,20 @@ namespace BDInfo
                     playlistTotalLength.Minutes,
                     playlistTotalLength.Seconds);
 
+                ulong effectiveTotalSize = GetEffectiveTotalSize(playlist);
+
                 string totalSize = string.Format(CultureInfo.InvariantCulture,
-                    "{0:N0}", playlist.TotalSize);
+                    "{0:N0}", effectiveTotalSize);
+
+                double effectiveTotalBitRate = 0;
+                if (playlist.TotalLength > 0)
+                {
+                    effectiveTotalBitRate = Math.Round((effectiveTotalSize * 8.0) / playlist.TotalLength / 10000) / 100;
+                }
 
                 string totalBitrate = string.Format(CultureInfo.InvariantCulture,
                     "{0:F2}",
-                    Math.Round((double)playlist.TotalBitRate / 10000) / 100);
+                    effectiveTotalBitRate);
 
                 TimeSpan playlistAngleLength = new TimeSpan((long)(playlist.TotalAngleLength * 10000000));
 
