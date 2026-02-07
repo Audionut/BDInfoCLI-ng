@@ -25,6 +25,7 @@ namespace BDInfo.Cli
             Console.Error.WriteLine("  -l, --list        Print the list of playlists.");
             Console.Error.WriteLine("  -m, --mpls <v>    Comma separated list of playlists to scan.");
             Console.Error.WriteLine("  -w, --whole       Scan whole disc - every playlist.");
+            Console.Error.WriteLine("  -q, --quick       Quick scan (default is full scan).");
             Console.Error.WriteLine("  -v, --version     Print the version.");
             Environment.Exit(-1);
         }
@@ -135,6 +136,7 @@ namespace BDInfo.Cli
             bool version = false;
             bool whole = false;
             bool list = false;
+            bool quick = false;
             string? mpls = null;
 
             // Lightweight, cross-platform option parsing (replaces Mono.Options)
@@ -150,6 +152,7 @@ namespace BDInfo.Cli
                 if (a == "-l" || a == "--list") { list = true; continue; }
                 if (a == "-w" || a == "--whole") { whole = true; continue; }
                 if (a == "-v" || a == "--version") { version = true; continue; }
+                if (a == "-q" || a == "--quick") { quick = true; continue; }
                 if (a.StartsWith("-m=") || a.StartsWith("--mpls=")) { mpls = a.Substring(a.IndexOf('=') + 1); continue; }
                 if (a == "-m" || a == "--mpls") { if (i + 1 < args.Length) { mpls = args[++i]; continue; } else show_help("Error - missing value for --mpls"); }
 
@@ -375,7 +378,7 @@ namespace BDInfo.Cli
                     Console.WriteLine("{0,16}{1,-15}{2,-13}{3}", "", "File", "Elapsed", "Remaining");
                     Console.Write("Scanning entire disc...");
                     var discSw = System.Diagnostics.Stopwatch.StartNew();
-                    var scanState = new ScanState() { IsFullScan = whole };
+                    var scanState = new ScanState() { IsFullScan = !quick };
                     foreach (TSStreamFile streamFile in streamFiles)
                     {
                         try
@@ -460,7 +463,7 @@ namespace BDInfo.Cli
                             }
                         }
 
-                        var scanState = new ScanState() { IsFullScan = whole };
+                        var scanState = new ScanState() { IsFullScan = !quick };
                         foreach (TSStreamFile streamFile in filesForPlaylist)
                         {
                             try

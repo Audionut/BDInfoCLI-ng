@@ -319,11 +319,8 @@ namespace BDInfo
                     break;
 
                 case TSStreamType.PRESENTATION_GRAPHICS:
-                    if (isFullScan)
-                        TSCodecPGS.Scan(
-                            (TSGraphicsStream)stream, buffer, ref streamState.StreamTag);
-                    else
-                        stream.IsInitialized = true;
+                    TSCodecPGS.Scan(
+                        (TSGraphicsStream)stream, buffer, ref streamState.StreamTag);
                     break;
 
                 default:
